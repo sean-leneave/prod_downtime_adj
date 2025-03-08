@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import pyperclip
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from scipy.interpolate import interp1d
@@ -627,7 +628,7 @@ def copy_to_clipboard(data_type='rates'):
         temp_df.columns = ['Oil Volume', 'Gas Volume', 'Water Volume', 'Liquid Volume']
 
     temp_df.to_clipboard(excel=True)
-    st.success(f"{data_type.capitalize()} copied to clipboard.")
+    st.success(f"{data_type.capitalize()} copied to clipboard!")
 
 
 def create_mosaic_template(df_out: pd.DataFrame, entity_name: str, reserve_category: str) -> pd.DataFrame:
