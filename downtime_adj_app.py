@@ -627,7 +627,7 @@ def copy_to_clipboard(data_type='rates'):
         temp_df.columns = ['Oil Volume', 'Gas Volume', 'Water Volume', 'Liquid Volume']
 
     temp_df.to_clipboard(excel=True)
-    st.toast(f"{data_type.capitalize()} copied to clipboard!", icon='??')
+    st.success(f"{data_type.capitalize()} copied to clipboard.")
 
 
 def create_mosaic_template(df_out: pd.DataFrame, entity_name: str, reserve_category: str) -> pd.DataFrame:
@@ -979,7 +979,7 @@ if st.session_state.processed_data is not None:
 
                 # Write and download file directly
                 buffer.seek(0)
-                st.toast(f"Generated template for {entity_name}", icon="?")
+                st.success(f"Generated template for {entity_name}")
                 st.download_button(
                     label="Click here to Download Template",
                     data=buffer.getvalue(),
