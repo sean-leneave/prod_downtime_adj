@@ -114,24 +114,35 @@ def validate_input_data(forecast_df, downtime_df):
     warnings = []
 
     # Check forecast data
-    required_forecast_cols = ['oil_rate', 'gas_rate', 'water_rate']
-    missing_cols = [col for col in required_forecast_cols if col not in forecast_df.columns]
-    if missing_cols:
-        errors.append(f"Missing required columns in forecast data: {missing_cols}")
-    elif any(forecast_df[col].sum() == 0 for col in ['gas_rate', 'water_rate']):
-        # Check if any fluid phase is completely missing (all zeros)
-        zero_phases = [col.replace('_rate', '') for col in ['gas_rate', 'water_rate'] 
-                      if forecast_df[col].sum() == 0]
-        if zero_phases:
-            warnings.append(f"Warning: No {', '.join(zero_phases)} data provided. This may affect calculations.")
+    possible_fluid_cols = ['oil_rate', 'gas_rate', 'water_rate']
+    available_fluid_cols = [col for col in possible_fluid_cols if col in forecast_df.columns]
+    
+    # Check if at least one fluid type is present
+    if not available_fluid_cols:
+        errors.append("At least one fluid type (oil_rate, gas_rate, or water_rate) is required in forecast data")
+    else:
+        # Check if any available fluid has data (non-zero sum)
+        has_fluid_data = False
+        for col in available_fluid_cols:
+            if forecast_df[col].sum() > 0:
+                has_fluid_data = True
+                break
+        
+        if not has_fluid_data:
+            errors.append("At least one fluid type must have non-zero values")
+        
+        # Add warnings for missing fluid types
+        missing_fluids = [col.replace('_rate', '') for col in possible_fluid_cols if col not in available_fluid_cols]
+        if missing_fluids:
+            warnings.append(f"Note: No {', '.join(missing_fluids)} data provided. This is acceptable but may affect some calculations.")
 
     # Check downtime data
     if 'downtime_pct' not in downtime_df.columns:
         errors.append("Missing required column 'downtime_pct' in downtime data")
 
     # Check for negative values
-    for col in required_forecast_cols:
-        if col in forecast_df.columns and (forecast_df[col] < 0).any():
+    for col in available_fluid_cols:
+        if (forecast_df[col] < 0).any():
             errors.append(f"Negative values found in {col}")
 
     if 'downtime_pct' in downtime_df.columns:
@@ -856,15 +867,29 @@ with st.sidebar:
         - Downtime Percentage (0-1)
     - Common date formats are accepted
     - Use tab-separated values when pasting data (e.g. from Excel)
-    - All fluid phases (oil, gas, water) should be included
+    - At least one fluid phase (oil, gas, or water) is required
+    """)
     
-    ### Example Format
+    st.markdown("""
+    ### Example Format (All Fluids)
     ```
     date    oil_rate    gas_rate    water_rate
     2023-01-31    100    200    50
     2023-02-28    95    190    55
     ```
+    """)
     
+    st.markdown("""
+    ### Example Format (Single Fluid)
+    ```
+    date    oil_rate
+    2023-01-31    100
+    2023-02-28    95
+    ```
+    """)
+    
+    st.markdown("""
+    ### Example Format (Downtime)
     ```
     date    downtime_pct
     2023-01-31    0.05
@@ -882,12 +907,12 @@ col1, col2 = st.columns(2)
 with col1:
     st.markdown('<p class="input-title">Enter Monthly Forecast</p>', unsafe_allow_html=True)
     forecast_data = st.text_area(
-        "Paste tab-separated data with columns: date, oil_rate, gas_rate, water_rate",
+        "Paste tab-separated data with columns: date and at least one of oil_rate, gas_rate, water_rate",
         value=st.session_state.forecast_data,
         height=200,
         label_visibility="collapsed",
         key="forecast_input",
-        placeholder="date\toil_rate\tgas_rate\twater_rate\n2023-01-31\t100\t200\t50\n2023-02-28\t95\t190\t55"
+        placeholder="date\toil_rate\n2023-01-31\t100\n2023-02-28\t95\n\n# Or with multiple fluids:\n# date\toil_rate\tgas_rate\twater_rate\n# 2023-01-31\t100\t200\t50\n# 2023-02-28\t95\t190\t55"
     )
 
 with col2:
