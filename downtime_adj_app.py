@@ -988,3 +988,4 @@ if st.session_state.processed_data is not None:
                 )
     # Add extra spacing at the bottom
     st.markdown("<div style='margin: 3rem 0;'></div>", unsafe_allow_html=True)
+
