@@ -626,8 +626,25 @@ def copy_to_clipboard(data_type='rates'):
         temp_df = df[['adj_oil_volume', 'adj_gas_volume', 'adj_water_volume', 'adj_liquid_volume']].copy()
         temp_df.columns = ['Oil Volume', 'Gas Volume', 'Water Volume', 'Liquid Volume']
 
-    temp_df.to_clipboard(excel=True)
-    st.success(f"{data_type.capitalize()} copied to clipboard!")
+    # Create CSV for download
+    csv = temp_df.to_csv(index=True)
+    
+    # Create a download button
+    st.download_button(
+        label=f"Download {data_type.capitalize()} as CSV",
+        data=csv,
+        file_name=f"{data_type}_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.csv",
+        mime="text/csv"
+    )
+    
+    # Display data in a text area for manual copying
+    st.write(f"**{data_type.capitalize()} data (select all and copy):**")
+    
+    # Convert to tab-separated format for better clipboard pasting
+    tsv_data = temp_df.to_csv(sep='\t', index=True)
+    st.text_area("", tsv_data, height=150)
+    
+    st.info("👆 Select all text in the box above (Ctrl+A or Cmd+A), then copy (Ctrl+C or Cmd+C) to clipboard.")
 
 
 def create_mosaic_template(df_out: pd.DataFrame, entity_name: str, reserve_category: str) -> pd.DataFrame:
@@ -896,11 +913,13 @@ if st.session_state.processed_data is not None:
     button_cols = st.columns([1, 1, 1])
 
     with button_cols[0]:
-        if st.button("Copy Rates to Clipboard",  use_container_width=True):
+        rates_expander = st.expander("Export Rates Data")
+        with rates_expander:
             copy_to_clipboard('rates')
 
     with button_cols[1]:
-        if st.button("Copy Volumes to Clipboard", use_container_width=True):
+        volumes_expander = st.expander("Export Volumes Data")
+        with volumes_expander:
             copy_to_clipboard('volumes')
 
     with button_cols[2]:
@@ -988,4 +1007,3 @@ if st.session_state.processed_data is not None:
                 )
     # Add extra spacing at the bottom
     st.markdown("<div style='margin: 3rem 0;'></div>", unsafe_allow_html=True)
-
