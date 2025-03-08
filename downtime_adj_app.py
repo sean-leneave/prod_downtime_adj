@@ -55,12 +55,43 @@ def process_input_data(forecast_data, downtime_data):
 
     try:
         # Convert strings to dataframes
-        forecast_df = pd.read_csv(io.StringIO(forecast_data), sep='\t')
-        downtime_df = pd.read_csv(io.StringIO(downtime_data), sep='\t')
+        try:
+            forecast_df = pd.read_csv(io.StringIO(forecast_data), sep='\t')
+            if len(forecast_df.columns) == 1:
+                # Try comma separator if tab didn't work
+                forecast_df = pd.read_csv(io.StringIO(forecast_data), sep=',')
+                st.info("Detected comma-separated values for forecast data instead of tabs. Processing anyway.")
+        except Exception as e:
+            st.error(f"Error parsing forecast data: {str(e)}\nPlease ensure data is tab-separated with proper headers.")
+            return None, None
+
+        try:
+            downtime_df = pd.read_csv(io.StringIO(downtime_data), sep='\t')
+            if len(downtime_df.columns) == 1:
+                # Try comma separator if tab didn't work
+                downtime_df = pd.read_csv(io.StringIO(downtime_data), sep=',')
+                st.info("Detected comma-separated values for downtime data instead of tabs. Processing anyway.")
+        except Exception as e:
+            st.error(f"Error parsing downtime data: {str(e)}\nPlease ensure data is tab-separated with proper headers.")
+            return None, None
+
+        # Check for required columns
+        if 'date' not in forecast_df.columns:
+            st.error("Forecast data must include a 'date' column.")
+            return None, None
+            
+        if 'date' not in downtime_df.columns:
+            st.error("Downtime data must include a 'date' column.")
+            return None, None
 
         # Convert dates and set index
-        forecast_df['date'] = pd.to_datetime(forecast_df['date'])
-        downtime_df['date'] = pd.to_datetime(downtime_df['date'])
+        try:
+            forecast_df['date'] = pd.to_datetime(forecast_df['date'])
+            downtime_df['date'] = pd.to_datetime(downtime_df['date'])
+        except Exception as e:
+            st.error(f"Error converting dates: {str(e)}\nPlease ensure dates are in a standard format (e.g., YYYY-MM-DD).")
+            return None, None
+            
         forecast_df.set_index('date', inplace=True)
         downtime_df.set_index('date', inplace=True)
 
@@ -70,22 +101,29 @@ def process_input_data(forecast_data, downtime_data):
         st.error("The input data appears to be empty. Please check your input data.")
         return None, None
     except ValueError as e:
-        st.error("Invalid data format. Please check your input data format.")
+        st.error(f"Invalid data format: {str(e)}\nPlease check your input data format.")
         return None, None
     except Exception as e:
-        st.error("Error processing data. Please check your input format.")
+        st.error(f"Error processing data: {str(e)}\nPlease check your input format.")
         return None, None
 
 
 def validate_input_data(forecast_df, downtime_df):
     """Validate input dataframes."""
     errors = []
+    warnings = []
 
     # Check forecast data
     required_forecast_cols = ['oil_rate', 'gas_rate', 'water_rate']
     missing_cols = [col for col in required_forecast_cols if col not in forecast_df.columns]
     if missing_cols:
         errors.append(f"Missing required columns in forecast data: {missing_cols}")
+    elif any(forecast_df[col].sum() == 0 for col in ['gas_rate', 'water_rate']):
+        # Check if any fluid phase is completely missing (all zeros)
+        zero_phases = [col.replace('_rate', '') for col in ['gas_rate', 'water_rate'] 
+                      if forecast_df[col].sum() == 0]
+        if zero_phases:
+            warnings.append(f"Warning: No {', '.join(zero_phases)} data provided. This may affect calculations.")
 
     # Check downtime data
     if 'downtime_pct' not in downtime_df.columns:
@@ -99,8 +137,35 @@ def validate_input_data(forecast_df, downtime_df):
     if 'downtime_pct' in downtime_df.columns:
         if (downtime_df['downtime_pct'] < 0).any() or (downtime_df['downtime_pct'] > 1).any():
             errors.append("Downtime percentage must be between 0 and 1")
+    
+    # Validate dates (check if they are end-of-month)
+    if not forecast_df.empty:
+        for date in forecast_df.index:
+            next_day = date + pd.Timedelta(days=1)
+            if next_day.month != date.month:
+                # This is an end-of-month date (good)
+                pass
+            elif date.day == 1:
+                errors.append(f"Date {date.strftime('%Y-%m-%d')} appears to be a first-of-month date. Please use end-of-month dates.")
+            else:
+                warnings.append(f"Date {date.strftime('%Y-%m-%d')} is not an end-of-month date. This may affect monthly calculations.")
+    
+    # Check date alignment between forecast and downtime data
+    if not forecast_df.empty and not downtime_df.empty:
+        forecast_dates = set(forecast_df.index)
+        downtime_dates = set(downtime_df.index)
+        
+        if forecast_dates != downtime_dates:
+            missing_in_forecast = downtime_dates - forecast_dates
+            missing_in_downtime = forecast_dates - downtime_dates
+            
+            if missing_in_forecast:
+                warnings.append(f"Some dates in downtime data are missing from forecast data: {', '.join(d.strftime('%Y-%m-%d') for d in sorted(missing_in_forecast)[:3])}{' and more' if len(missing_in_forecast) > 3 else ''}")
+            
+            if missing_in_downtime:
+                warnings.append(f"Some dates in forecast data are missing from downtime data: {', '.join(d.strftime('%Y-%m-%d') for d in sorted(missing_in_downtime)[:3])}{' and more' if len(missing_in_downtime) > 3 else ''}")
 
-    return errors
+    return errors, warnings
 
 
 def format_numbers(df, is_rate=True):
@@ -782,15 +847,29 @@ with st.sidebar:
 
     ### Data Format
     - Production Forecast: 
-        - Date, monthly
+        - Date, monthly (use **end-of-month** dates)
         - Oil Rate (bopd)
         - Gas Rate (mcfd)
         - Water Rate (bwpd)
     - Downtime Forecast: 
-        - Date, monthly
+        - Date, monthly (use **end-of-month** dates)
         - Downtime Percentage (0-1)
     - Common date formats are accepted
     - Use tab-separated values when pasting data (e.g. from Excel)
+    - All fluid phases (oil, gas, water) should be included
+    
+    ### Example Format
+    ```
+    date    oil_rate    gas_rate    water_rate
+    2023-01-31    100    200    50
+    2023-02-28    95    190    55
+    ```
+    
+    ```
+    date    downtime_pct
+    2023-01-31    0.05
+    2023-02-28    0.08
+    ```
     """)
 
 # Main application
@@ -807,7 +886,8 @@ with col1:
         value=st.session_state.forecast_data,
         height=200,
         label_visibility="collapsed",
-        key="forecast_input"
+        key="forecast_input",
+        placeholder="date\toil_rate\tgas_rate\twater_rate\n2023-01-31\t100\t200\t50\n2023-02-28\t95\t190\t55"
     )
 
 with col2:
@@ -817,7 +897,8 @@ with col2:
         value=st.session_state.downtime_data,
         height=200,
         label_visibility="collapsed",
-        key="downtime_input"
+        key="downtime_input",
+        placeholder="date\tdowntime_pct\n2023-01-31\t0.05\n2023-02-28\t0.08"
     )
 
 
@@ -839,11 +920,17 @@ def process_and_store_data():
         downtime_df.set_index('date', inplace=True)
 
         # Validate data
-        errors = validate_input_data(forecast_df, downtime_df)
+        errors, warnings = validate_input_data(forecast_df, downtime_df)
         if errors:
             for error in errors:
                 st.error(error)
             return False
+        
+        # Display warnings but continue processing
+        if warnings:
+            with st.expander("⚠️ Warnings - Click to expand", expanded=True):
+                for warning in warnings:
+                    st.warning(warning)
 
         # Combine and process data
         df = forecast_df.join(downtime_df, how='left')
