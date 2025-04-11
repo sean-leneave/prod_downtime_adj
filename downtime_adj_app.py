@@ -846,36 +846,148 @@ st.markdown("### Input Data")
 col1, col2 = st.columns(2)
 
 with col1:
-    st.markdown('<p class="input-title">Enter Monthly Forecast</p>', unsafe_allow_html=True)
-    forecast_data = st.text_area(
-        "Paste tab-separated data with columns: date, oil_rate, gas_rate, water_rate",
-        value=st.session_state.forecast_data,
-        height=200,
-        label_visibility="collapsed",
-        key="forecast_input"
+    st.subheader("Production Forecast")
+    # Create a sample dataframe for the grid
+    forecast_columns = ['date', 'oil_rate', 'gas_rate', 'water_rate']
+    
+    # Initialize with 5 empty rows if no data exists
+    if not st.session_state.forecast_data:
+        forecast_df = pd.DataFrame({
+            'date': [''] * 5,
+            'oil_rate': [None] * 5,
+            'gas_rate': [None] * 5,
+            'water_rate': [None] * 5
+        })
+    else:
+        try:
+            forecast_df = pd.read_csv(io.StringIO(st.session_state.forecast_data), sep='\t')
+            if len(forecast_df.columns) == 1:
+                forecast_df = pd.read_csv(io.StringIO(st.session_state.forecast_data), sep=',')
+            # Ensure date column is in string format
+            if 'date' in forecast_df.columns:
+                forecast_df['date'] = pd.to_datetime(forecast_df['date']).dt.strftime('%Y-%m-%d')
+        except:
+            forecast_df = pd.DataFrame({
+                'date': [''] * 5,
+                'oil_rate': [None] * 5,
+                'gas_rate': [None] * 5,
+                'water_rate': [None] * 5
+            })
+    
+    # Display editable dataframe
+    edited_forecast_df = st.data_editor(
+        forecast_df,
+        num_rows="dynamic",
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "date": st.column_config.TextColumn(
+                "Date",
+                help="Enter date in YYYY-MM-DD format",
+                width="fixed",
+                default="",
+            ),
+            "oil_rate": st.column_config.NumberColumn(
+                "Oil Rate (bopd)",
+                help="Enter oil rate in barrels per day",
+                min_value=0,
+                format="%d",
+                width="fixed",
+                default=None,
+            ),
+            "gas_rate": st.column_config.NumberColumn(
+                "Gas Rate (mcfd)",
+                help="Enter gas rate in thousand cubic feet per day",
+                min_value=0,
+                format="%d",
+                width="fixed",
+                default=None,
+            ),
+            "water_rate": st.column_config.NumberColumn(
+                "Water Rate (bwpd)",
+                help="Enter water rate in barrels per day",
+                min_value=0,
+                format="%d",
+                width="fixed",
+                default=None,
+            ),
+        }
     )
+    
+    # Convert edited dataframe to string for storage
+    st.session_state.forecast_data = edited_forecast_df.to_csv(sep='\t', index=False)
 
 with col2:
-    st.markdown('<p class="input-title">Enter Monthly Downtime</p>', unsafe_allow_html=True)
-    downtime_data = st.text_area(
-        "Paste tab-separated data with columns: date, downtime_pct",
-        value=st.session_state.downtime_data,
-        height=200,
-        label_visibility="collapsed",
-        key="downtime_input"
+    st.subheader("Downtime Forecast")
+    # Create a sample dataframe for the grid
+    downtime_columns = ['date', 'downtime_pct']
+    
+    # Initialize with 5 empty rows if no data exists
+    if not st.session_state.downtime_data:
+        downtime_df = pd.DataFrame({
+            'date': [''] * 5,
+            'downtime_pct': [None] * 5
+        })
+    else:
+        try:
+            downtime_df = pd.read_csv(io.StringIO(st.session_state.downtime_data), sep='\t')
+            if len(downtime_df.columns) == 1:
+                downtime_df = pd.read_csv(io.StringIO(st.session_state.downtime_data), sep=',')
+            # Ensure date column is in string format
+            if 'date' in downtime_df.columns:
+                downtime_df['date'] = pd.to_datetime(downtime_df['date']).dt.strftime('%Y-%m-%d')
+        except:
+            downtime_df = pd.DataFrame({
+                'date': [''] * 5,
+                'downtime_pct': [None] * 5
+            })
+    
+    # Display editable dataframe
+    edited_downtime_df = st.data_editor(
+        downtime_df,
+        num_rows="dynamic",
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "date": st.column_config.TextColumn(
+                "Date",
+                help="Enter date in YYYY-MM-DD format",
+                width="fixed",
+                default="",
+            ),
+            "downtime_pct": st.column_config.NumberColumn(
+                "Downtime Percentage",
+                help="Enter downtime percentage (0-100 or 0-1)",
+                min_value=0,
+                max_value=100,
+                format="%.2f",
+                width="fixed",
+                default=None,
+            ),
+        }
     )
+    
+    # Convert edited dataframe to string for storage
+    st.session_state.downtime_data = edited_downtime_df.to_csv(sep='\t', index=False)
 
+# Add Clear Input button
+if st.button("Clear Input"):
+    st.session_state.forecast_data = ""
+    st.session_state.downtime_data = ""
+    st.session_state.processed_data = None
+    st.session_state.figure = None
+    st.rerun()
 
 def process_and_store_data():
     """Process input data and store results in session state"""
-    if not forecast_data.strip() or not downtime_data.strip():
+    if not st.session_state.forecast_data or not st.session_state.downtime_data:
         st.error("Please provide both forecast and downtime data.")
         return False
 
     try:
         # Process input data
-        forecast_df = pd.read_csv(io.StringIO(forecast_data), sep='\t')
-        downtime_df = pd.read_csv(io.StringIO(downtime_data), sep='\t')
+        forecast_df = pd.read_csv(io.StringIO(st.session_state.forecast_data), sep='\t')
+        downtime_df = pd.read_csv(io.StringIO(st.session_state.downtime_data), sep='\t')
 
         # Convert dates and set index
         forecast_df['date'] = pd.to_datetime(forecast_df['date'])
@@ -898,8 +1010,8 @@ def process_and_store_data():
         # Store results in session state
         st.session_state.processed_data = df_out
         st.session_state.figure = create_plotly_figure(df_out)
-        st.session_state.forecast_data = forecast_data
-        st.session_state.downtime_data = downtime_data
+        st.session_state.forecast_data = st.session_state.forecast_data
+        st.session_state.downtime_data = st.session_state.downtime_data
 
         return True
     except Exception as e:
