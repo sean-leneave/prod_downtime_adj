@@ -47,6 +47,17 @@ def add_one_month(current_date):
     return pd.Timestamp(new_year, new_month, new_day)
 
 
+def standardize_to_end_of_month(date):
+    """Convert any date to end of month format.
+    All dates are converted to the end of their respective months.
+    """
+    if isinstance(date, str):
+        date = pd.to_datetime(date)
+    
+    # Always convert to end of month
+    return date.replace(day=date.days_in_month)
+
+
 def process_input_data(forecast_data, downtime_data):
     """Process input data into proper format for calculations."""
     if not forecast_data or not downtime_data:
@@ -55,25 +66,59 @@ def process_input_data(forecast_data, downtime_data):
 
     try:
         # Convert strings to dataframes
-        forecast_df = pd.read_csv(io.StringIO(forecast_data), sep='\t')
-        downtime_df = pd.read_csv(io.StringIO(downtime_data), sep='\t')
+        try:
+            forecast_df = pd.read_csv(io.StringIO(forecast_data), sep='\t')
+            if len(forecast_df.columns) == 1:
+                # Try comma separator if tab didn't work
+                forecast_df = pd.read_csv(io.StringIO(forecast_data), sep=',')
+                st.info("Detected comma-separated values for forecast data instead of tabs. Processing anyway.")
+        except Exception as e:
+            st.error(f"Error parsing forecast data: {str(e)}\nPlease ensure data is tab-separated with proper headers.")
+            return None, None
 
-        # Convert dates and set index
-        forecast_df['date'] = pd.to_datetime(forecast_df['date'])
-        downtime_df['date'] = pd.to_datetime(downtime_df['date'])
+        try:
+            downtime_df = pd.read_csv(io.StringIO(downtime_data), sep='\t')
+            if len(downtime_df.columns) == 1:
+                # Try comma separator if tab didn't work
+                downtime_df = pd.read_csv(io.StringIO(downtime_data), sep=',')
+                st.info("Detected comma-separated values for downtime data instead of tabs. Processing anyway.")
+        except Exception as e:
+            st.error(f"Error parsing downtime data: {str(e)}\nPlease ensure data is tab-separated with proper headers.")
+            return None, None
+
+        # Check for required columns
+        if 'date' not in forecast_df.columns:
+            st.error("Forecast data must include a 'date' column.")
+            return None, None
+            
+        if 'date' not in downtime_df.columns:
+            st.error("Downtime data must include a 'date' column.")
+            return None, None
+
+        # Convert dates to datetime and standardize to end of month
+        forecast_df['date'] = pd.to_datetime(forecast_df['date']).apply(standardize_to_end_of_month)
+        downtime_df['date'] = pd.to_datetime(downtime_df['date']).apply(standardize_to_end_of_month)
+
+        # Standardize downtime percentages to decimal format
+        if 'downtime_pct' in downtime_df.columns:
+            try:
+                downtime_df['downtime_pct'] = downtime_df['downtime_pct'].apply(standardize_downtime_percentage)
+            except ValueError as e:
+                st.error(f"Error in downtime data: {str(e)}")
+                return None, None
+
+        # Set index to date
         forecast_df.set_index('date', inplace=True)
         downtime_df.set_index('date', inplace=True)
 
+        # Sort by date
+        forecast_df.sort_index(inplace=True)
+        downtime_df.sort_index(inplace=True)
+
         return forecast_df, downtime_df
 
-    except pd.errors.EmptyDataError:
-        st.error("The input data appears to be empty. Please check your input data.")
-        return None, None
-    except ValueError as e:
-        st.error("Invalid data format. Please check your input data format.")
-        return None, None
     except Exception as e:
-        st.error("Error processing data. Please check your input format.")
+        st.error(f"Error processing data: {str(e)}")
         return None, None
 
 
