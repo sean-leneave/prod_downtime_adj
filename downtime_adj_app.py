@@ -769,215 +769,6 @@ if 'downtime_data' not in st.session_state:
 if 'figure' not in st.session_state:
     st.session_state.figure = None
 
-# Custom CSS
-st.markdown("""
-    <style>
-    .block-container {
-        padding-top: 1rem;
-        padding-bottom: 0rem;
-    }
-    .section-break {
-        margin: 0.3rem 0;
-    }
-    .table-title {
-        text-align: center;
-        font-size: 20px;
-        font-weight: bold;
-        margin: 0.3rem;
-    }
-    .input-title {
-        font-size: 20px;
-        font-weight: 600;
-        text-align: center;
-        margin-bottom: 8px;
-    }
-    .plot-title {
-        font-weight: bold;
-        font-size: 24px;
-        text-align: center;
-        margin-bottom: 0.5rem;
-    }
-    .stButton > button {
-        font-weight: 700 !important;
-    }
-    [data-testid="stDataFrame"] div:has(> table) {
-        width: 100%;
-        text-align: center;
-    }
-    [data-testid="stDataFrame"] table {
-        width: 100%;
-        text-align: center;
-    }
-    [data-testid="stDataFrame"] th {
-        text-align: center !important;
-    }
-    [data-testid="stDataFrame"] td {
-        text-align: center !important;
-    }
-""", unsafe_allow_html=True)
-
-# Sidebar instructions
-with st.sidebar:
-    st.header("Instructions")
-    st.markdown("""
-    1. Paste monthly forecast into the input areas
-    2. Click 'Process Data' to run calculations
-    3. Compare input and adjusted forecasts
-    4. Copy or download processed forecasts
-
-    ### Data Format
-    - Production Forecast: 
-        - Date, monthly
-        - Oil Rate (bopd)
-        - Gas Rate (mcfd)
-        - Water Rate (bwpd)
-    - Downtime Forecast: 
-        - Date, monthly
-        - Downtime Percentage (0-1)
-    - Common date formats are accepted
-    - Use tab-separated values when pasting data (e.g. from Excel)
-    """)
-
-# Main application
-st.title("Forecast-Downtime Processing Tool")
-
-# Input Section
-st.markdown("### Input Data")
-col1, col2 = st.columns(2)
-
-with col1:
-    st.subheader("Production Forecast")
-    # Create a sample dataframe for the grid
-    forecast_columns = ['date', 'oil_rate', 'gas_rate', 'water_rate']
-    
-    # Initialize with 5 empty rows if no data exists
-    if not st.session_state.forecast_data:
-        forecast_df = pd.DataFrame({
-            'date': [''] * 5,
-            'oil_rate': [None] * 5,
-            'gas_rate': [None] * 5,
-            'water_rate': [None] * 5
-        })
-    else:
-        try:
-            forecast_df = pd.read_csv(io.StringIO(st.session_state.forecast_data), sep='\t')
-            if len(forecast_df.columns) == 1:
-                forecast_df = pd.read_csv(io.StringIO(st.session_state.forecast_data), sep=',')
-            # Ensure date column is in string format
-            if 'date' in forecast_df.columns:
-                forecast_df['date'] = pd.to_datetime(forecast_df['date']).dt.strftime('%Y-%m-%d')
-        except:
-            forecast_df = pd.DataFrame({
-                'date': [''] * 5,
-                'oil_rate': [None] * 5,
-                'gas_rate': [None] * 5,
-                'water_rate': [None] * 5
-            })
-    
-    # Display editable dataframe
-    edited_forecast_df = st.data_editor(
-        forecast_df,
-        num_rows="dynamic",
-        use_container_width=True,
-        hide_index=True,
-        column_config={
-            "date": st.column_config.TextColumn(
-                "Date",
-                help="Enter date in YYYY-MM-DD format",
-                width="fixed",
-                default="",
-            ),
-            "oil_rate": st.column_config.NumberColumn(
-                "Oil Rate (bopd)",
-                help="Enter oil rate in barrels per day",
-                min_value=0,
-                format="%d",
-                width="fixed",
-                default=None,
-            ),
-            "gas_rate": st.column_config.NumberColumn(
-                "Gas Rate (mcfd)",
-                help="Enter gas rate in thousand cubic feet per day",
-                min_value=0,
-                format="%d",
-                width="fixed",
-                default=None,
-            ),
-            "water_rate": st.column_config.NumberColumn(
-                "Water Rate (bwpd)",
-                help="Enter water rate in barrels per day",
-                min_value=0,
-                format="%d",
-                width="fixed",
-                default=None,
-            ),
-        }
-    )
-    
-    # Convert edited dataframe to string for storage
-    st.session_state.forecast_data = edited_forecast_df.to_csv(sep='\t', index=False)
-
-with col2:
-    st.subheader("Downtime Forecast")
-    # Create a sample dataframe for the grid
-    downtime_columns = ['date', 'downtime_pct']
-    
-    # Initialize with 5 empty rows if no data exists
-    if not st.session_state.downtime_data:
-        downtime_df = pd.DataFrame({
-            'date': [''] * 5,
-            'downtime_pct': [None] * 5
-        })
-    else:
-        try:
-            downtime_df = pd.read_csv(io.StringIO(st.session_state.downtime_data), sep='\t')
-            if len(downtime_df.columns) == 1:
-                downtime_df = pd.read_csv(io.StringIO(st.session_state.downtime_data), sep=',')
-            # Ensure date column is in string format
-            if 'date' in downtime_df.columns:
-                downtime_df['date'] = pd.to_datetime(downtime_df['date']).dt.strftime('%Y-%m-%d')
-        except:
-            downtime_df = pd.DataFrame({
-                'date': [''] * 5,
-                'downtime_pct': [None] * 5
-            })
-    
-    # Display editable dataframe
-    edited_downtime_df = st.data_editor(
-        downtime_df,
-        num_rows="dynamic",
-        use_container_width=True,
-        hide_index=True,
-        column_config={
-            "date": st.column_config.TextColumn(
-                "Date",
-                help="Enter date in YYYY-MM-DD format",
-                width="fixed",
-                default="",
-            ),
-            "downtime_pct": st.column_config.NumberColumn(
-                "Downtime Percentage",
-                help="Enter downtime percentage (0-100 or 0-1)",
-                min_value=0,
-                max_value=100,
-                format="%.2f",
-                width="fixed",
-                default=None,
-            ),
-        }
-    )
-    
-    # Convert edited dataframe to string for storage
-    st.session_state.downtime_data = edited_downtime_df.to_csv(sep='\t', index=False)
-
-# Add Clear Input button
-if st.button("Clear Input"):
-    st.session_state.forecast_data = ""
-    st.session_state.downtime_data = ""
-    st.session_state.processed_data = None
-    st.session_state.figure = None
-    st.rerun()
-
 def process_and_store_data():
     """Process input data and store results in session state"""
     if not st.session_state.forecast_data or not st.session_state.downtime_data:
@@ -1018,11 +809,253 @@ def process_and_store_data():
         st.error(f"Error processing data: {str(e)}")
         return False
 
+# Custom CSS
+st.markdown("""
+    <style>
+    .block-container {
+        padding-top: 0.5rem;
+        padding-bottom: 0rem;
+    }
+    .section-break {
+        margin: 0.2rem 0;
+    }
+    .table-title {
+        text-align: center;
+        font-size: 18px;
+        font-weight: bold;
+        margin: 0.2rem;
+    }
+    .input-title {
+        font-size: 18px;
+        font-weight: 600;
+        text-align: center;
+        margin: 0.5rem 0 0.2rem 0;
+    }
+    .plot-title {
+        font-weight: bold;
+        font-size: 20px;
+        text-align: center;
+        margin-bottom: 0.3rem;
+    }
+    .stButton > button {
+        font-weight: 700 !important;
+        padding: 0.3rem 1rem !important;
+        height: auto !important;
+    }
+    div[data-testid="stHorizontalBlock"] div[data-testid="column"]:first-child button {
+        background-color: #FF4B4B !important;
+        color: white !important;
+        border: none !important;
+    }
+    div[data-testid="stHorizontalBlock"] div[data-testid="column"]:first-child button:hover {
+        background-color: #FF3333 !important;
+    }
+    [data-testid="stDataFrame"] div:has(> table) {
+        width: 100%;
+        text-align: center;
+    }
+    [data-testid="stDataFrame"] table {
+        width: 100%;
+        text-align: center;
+        margin-bottom: 0.5rem !important;
+    }
+    [data-testid="stDataFrame"] th {
+        text-align: center !important;
+    }
+    [data-testid="stDataFrame"] td {
+        text-align: center !important;
+    }
+    .stMarkdown {
+        margin-bottom: 0.2rem;
+    }
+    .stSubheader {
+        margin-bottom: 0.2rem;
+    }
+    .stButton {
+        margin: 0 !important;
+    }
+    .streamlit-expanderHeader {
+        padding-top: 0.2rem !important;
+        padding-bottom: 0.2rem !important;
+    }
+    .streamlit-expanderContent {
+        padding-top: 0.2rem !important;
+        padding-bottom: 0.2rem !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
-# Process button
-st.markdown("<div class='section-break'></div>", unsafe_allow_html=True)
-if st.button("Process Data"):
-    process_and_store_data()
+# Sidebar instructions
+with st.sidebar:
+    st.header("Instructions")
+    st.markdown("""
+    1. Paste monthly forecast into the input areas
+    2. Click 'Process Data' to run calculations
+    3. Compare input and adjusted forecasts
+    4. Copy or download processed forecasts
+
+    ### Data Format
+    - Production Forecast: 
+        - Date, monthly
+        - Oil Rate (bopd)
+        - Gas Rate (mcfd)
+        - Water Rate (bwpd)
+    - Downtime Forecast: 
+        - Date, monthly
+        - Downtime Percentage (0-1)
+    - Common date formats are accepted
+    - Use tab-separated values when pasting data (e.g. from Excel)
+    """)
+
+# Main application
+st.title("Forecast-Downtime Processing Tool")
+
+# Input Section
+st.markdown("### Input Data")
+col1, col2 = st.columns(2)
+
+with col1:
+    st.markdown("<p class='input-title'>Production Forecast</p>", unsafe_allow_html=True)
+    # Create a sample dataframe for the grid
+    forecast_columns = ['date', 'oil_rate', 'gas_rate', 'water_rate']
+    
+    # Initialize with 5 empty rows if no data exists
+    if not st.session_state.forecast_data:
+        forecast_df = pd.DataFrame({
+            'date': [''] * 5,
+            'oil_rate': [None] * 5,
+            'gas_rate': [None] * 5,
+            'water_rate': [None] * 5
+        })
+    else:
+        try:
+            forecast_df = pd.read_csv(io.StringIO(st.session_state.forecast_data), sep='\t')
+            if len(forecast_df.columns) == 1:
+                forecast_df = pd.read_csv(io.StringIO(st.session_state.forecast_data), sep=',')
+            # Ensure date column is in string format
+            if 'date' in forecast_df.columns:
+                forecast_df['date'] = pd.to_datetime(forecast_df['date']).dt.strftime('%Y-%m-%d')
+        except:
+            forecast_df = pd.DataFrame({
+                'date': [''] * 5,
+                'oil_rate': [None] * 5,
+                'gas_rate': [None] * 5,
+                'water_rate': [None] * 5
+            })
+    
+    # Display editable dataframe
+    edited_forecast_df = st.data_editor(
+        forecast_df,
+        num_rows="dynamic",
+        use_container_width=True,
+        hide_index=True,
+        key="forecast_editor",
+        column_config={
+            "date": st.column_config.TextColumn(
+                "Date",
+                help="Enter date in YYYY-MM-DD format",
+                width="fixed",
+                default="",
+            ),
+            "oil_rate": st.column_config.NumberColumn(
+                "Oil Rate (bopd)",
+                help="Enter oil rate in barrels per day",
+                min_value=0,
+                format="%d",
+                width="fixed",
+                default=None,
+            ),
+            "gas_rate": st.column_config.NumberColumn(
+                "Gas Rate (mcfd)",
+                help="Enter gas rate in thousand cubic feet per day",
+                min_value=0,
+                format="%d",
+                width="fixed",
+                default=None,
+            ),
+            "water_rate": st.column_config.NumberColumn(
+                "Water Rate (bwpd)",
+                help="Enter water rate in barrels per day",
+                min_value=0,
+                format="%d",
+                width="fixed",
+                default=None,
+            ),
+        }
+    )
+    
+    # Only update session state if the data has actually changed
+    if edited_forecast_df is not None and not edited_forecast_df.equals(forecast_df):
+        st.session_state.forecast_data = edited_forecast_df.to_csv(sep='\t', index=False)
+
+with col2:
+    st.markdown("<p class='input-title'>Downtime Forecast</p>", unsafe_allow_html=True)
+    # Create a sample dataframe for the grid
+    downtime_columns = ['date', 'downtime_pct']
+    
+    # Initialize with 5 empty rows if no data exists
+    if not st.session_state.downtime_data:
+        downtime_df = pd.DataFrame({
+            'date': [''] * 5,
+            'downtime_pct': [None] * 5
+        })
+    else:
+        try:
+            downtime_df = pd.read_csv(io.StringIO(st.session_state.downtime_data), sep='\t')
+            if len(downtime_df.columns) == 1:
+                downtime_df = pd.read_csv(io.StringIO(st.session_state.downtime_data), sep=',')
+            # Ensure date column is in string format
+            if 'date' in downtime_df.columns:
+                downtime_df['date'] = pd.to_datetime(downtime_df['date']).dt.strftime('%Y-%m-%d')
+        except:
+            downtime_df = pd.DataFrame({
+                'date': [''] * 5,
+                'downtime_pct': [None] * 5
+            })
+    
+    # Display editable dataframe
+    edited_downtime_df = st.data_editor(
+        downtime_df,
+        num_rows="dynamic",
+        use_container_width=True,
+        hide_index=True,
+        key="downtime_editor",
+        column_config={
+            "date": st.column_config.TextColumn(
+                "Date",
+                help="Enter date in YYYY-MM-DD format",
+                width="fixed",
+                default="",
+            ),
+            "downtime_pct": st.column_config.NumberColumn(
+                "Downtime Percentage",
+                help="Enter downtime percentage (0-100 or 0-1)",
+                min_value=0,
+                max_value=100,
+                format="%.2f",
+                width="fixed",
+                default=None,
+            ),
+        }
+    )
+    
+    # Only update session state if the data has actually changed
+    if edited_downtime_df is not None and not edited_downtime_df.equals(downtime_df):
+        st.session_state.downtime_data = edited_downtime_df.to_csv(sep='\t', index=False)
+
+# Process and Clear buttons
+button_cols = st.columns([2, 3, 2])
+with button_cols[0]:
+    if st.button("Process Data", use_container_width=True, key="process_data_button"):
+        process_and_store_data()
+
+with button_cols[2]:
+    if st.button("Clear Input", key="clear_input_button", use_container_width=True):
+        st.session_state.forecast_data = ""
+        st.session_state.downtime_data = ""
+        st.session_state.processed_data = None
+        st.session_state.figure = None
+        st.experimental_rerun()
 
 # Display results if data is processed
 if st.session_state.processed_data is not None:
@@ -1066,16 +1099,16 @@ if st.session_state.processed_data is not None:
         st.dataframe(formatted_volume_df, height=400, use_container_width=True)
 
     # Buttons section
-    st.markdown("<div style='margin: 1rem 0;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='margin: 0.5rem 0;'></div>", unsafe_allow_html=True)
     button_cols = st.columns([1, 1, 1])
 
     with button_cols[0]:
-        rates_expander = st.expander("Export Rates Data")
+        rates_expander = st.expander("Export Rates Data", expanded=False)
         with rates_expander:
             copy_to_clipboard('rates')
 
     with button_cols[1]:
-        volumes_expander = st.expander("Export Volumes Data")
+        volumes_expander = st.expander("Export Volumes Data", expanded=False)
         with volumes_expander:
             copy_to_clipboard('volumes')
 
@@ -1093,21 +1126,8 @@ if st.session_state.processed_data is not None:
             use_container_width=True
         )
 
-    st.markdown("""
-        <style>
-        .vertical-align-container {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-        .vertical-align-container > div {
-            margin-right: 1rem;
-        }
-        </style>
-    """, unsafe_allow_html=True)
-
     # Mosaic template section
-    st.markdown("<div style='margin: 1.5rem 0;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='margin: 1rem 0;'></div>", unsafe_allow_html=True)
     st.markdown("### Generate Mosaic Template")
 
     mosaic_cols = st.columns([1, 1, 1])
