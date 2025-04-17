@@ -9,6 +9,8 @@ from openpyxl.styles import Font, PatternFill
 import plotly.io as pio
 from datetime import datetime
 import base64
+import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 
 # Constants
 COLORS = {
@@ -730,6 +732,56 @@ def create_plotly_figure(df_out):
                 range=[0, max_rate_rounded if j == 1 else max_cumulative_rounded]
             )
 
+    # Add WOR vs Np plot
+    fig = go.Figure()
+    
+    # Add interpolation points
+    fig.add_trace(go.Scatter(
+        x=np_values,
+        y=wor_values,
+        mode='markers',
+        name='Interpolation Points',
+        marker=dict(size=10, color='blue')
+    ))
+    
+    # Add forecast line
+    fig.add_trace(go.Scatter(
+        x=np_interp,
+        y=wor_interp,
+        mode='lines',
+        name='Forecast',
+        line=dict(color='red')
+    ))
+    
+    # Add vertical dashed line at 12M
+    fig.add_trace(go.Scatter(
+        x=[12_000_000, 12_000_000],
+        y=[0.1, 0.81],
+        mode='lines',
+        line=dict(color='black', dash='dash', width=1),
+        showlegend=False
+    ))
+    
+    # Add horizontal dashed line at WOR=0.81
+    fig.add_trace(go.Scatter(
+        x=[0, 12_000_000],
+        y=[0.81, 0.81],
+        mode='lines',
+        line=dict(color='black', dash='dash', width=1),
+        showlegend=False
+    ))
+    
+    # Add WOR lookup text
+    fig.add_annotation(
+        x=12_000_000,
+        y=0.1,
+        text="WOR = 0.81",
+        showarrow=False,
+        yshift=-20,
+        xshift=0,
+        font=dict(size=12)
+    )
+
     return fig
 
 
@@ -899,8 +951,116 @@ with st.sidebar:
         - Downtime Percentage (0-1 or 0-100)
     - Common date formats are accepted
     - Use tab-separated values when pasting data (e.g. from Excel)
-    - At least one fluid phase (oil, gas, or water) is required
     """)
+    
+    # Add Documentation button
+    if st.button("📚 View Documentation", use_container_width=True):
+        st.session_state.show_docs = True
+
+# Documentation Modal
+if 'show_docs' not in st.session_state:
+    st.session_state.show_docs = False
+
+if st.session_state.show_docs:
+    with st.expander("Documentation", expanded=True):
+        st.markdown("""
+        ## Process Flow & Interpolation Example
+        """)
+        
+        # Create two columns for the flowchart and plot
+        flow_col, plot_col = st.columns([1, 1])
+        
+        with flow_col:
+            # Process Flow diagram using Graphviz
+            process_flow = """
+            digraph {
+                rankdir=TB;
+                node [shape=box, style=filled, fillcolor=lightgray];
+                
+                Start [label="Start"];
+                Input [label="Input Data"];
+                Calc [label="Calculate Initial Rates"];
+                Interp [label="Interpolate GOR/WOR vs Np"];
+                Adjust [label="Adjust Rates for Downtime"];
+                Check [label="Check Np"];
+                End [label="End"];
+                
+                Start -> Input;
+                Input -> Calc;
+                Calc -> Interp;
+                Interp -> Adjust;
+                Adjust -> Check;
+                Check -> Interp [label="Output Np < Input Np"];
+                Check -> End [label="Target Reached"];
+            }
+            """
+            st.graphviz_chart(process_flow)
+        
+        with plot_col:
+            # Create data
+            np_values = np.linspace(0, 20_000_000, 6)
+            slope = 3.0 / 20_000_000
+            intercept = -2.0
+            log_wor_values = slope * np_values + intercept
+            wor_values = np.exp(log_wor_values)
+            
+            np_interp = np.linspace(0, 20_000_000, 100)
+            log_wor_interp = slope * np_interp + intercept
+            wor_interp = np.exp(log_wor_interp)
+            
+            # Create figure with smaller size
+            fig, ax = plt.subplots(figsize=(8, 5))
+            
+            # Plot data
+            ax.plot(np_interp/1e6, wor_interp, 'r-', label='Forecast', linewidth=2)
+            ax.plot(np_values/1e6, wor_values, 'bo', label='Interpolation Points', markersize=6)
+            
+            # Calculate the exact WOR value at Np = 12M
+            wor_at_12m = np.exp(slope * 12_000_000 + intercept)
+            
+            # Add reference lines only up to the intersection point
+            ax.plot([12, 12], [0.1, wor_at_12m], 'k--', linewidth=1, alpha=0.5)  # Vertical line
+            ax.plot([0, 12], [wor_at_12m, wor_at_12m], 'k--', linewidth=1, alpha=0.5)  # Horizontal line
+            
+            # Add text
+            ax.text(12.2, 0.15, 'WOR = 0.81', fontsize=10)
+            
+            # Set scales and limits
+            ax.set_yscale('log')
+            ax.set_ylim(0.1, 10)
+            ax.set_xlim(0, 20)
+            
+            # Set grid
+            ax.grid(True, which='both', linestyle='-', alpha=0.2)
+            ax.grid(True, which='minor', linestyle=':', alpha=0.2)
+            
+            # Set labels
+            ax.set_xlabel('Cumulative Oil Production (MMBO)')
+            ax.set_ylabel('Water-Oil Ratio (WOR)')
+            
+            # Format y-axis ticks
+            ax.yaxis.set_major_formatter(ticker.ScalarFormatter())
+            ax.yaxis.set_minor_formatter(ticker.ScalarFormatter())
+            
+            # Add legend
+            ax.legend()
+            
+            # Adjust layout
+            plt.tight_layout()
+            
+            # Convert plot to image and display
+            from io import BytesIO
+            
+            buf = BytesIO()
+            plt.savefig(buf, format='png', dpi=300, bbox_inches='tight')
+            buf.seek(0)
+            st.image(buf)
+            plt.close()
+        
+        # Close button for documentation
+        if st.button("Close Documentation"):
+            st.session_state.show_docs = False
+            st.experimental_rerun()
 
 # Main application
 st.title("Forecast-Downtime Processing Tool")
