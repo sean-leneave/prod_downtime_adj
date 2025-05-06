@@ -1,4 +1,4 @@
-Well Name,date,oil_rate,gas_rate,water_rate
+well_name,date,oil_rate,gas_rate,water_rate
 WellA,1/31/24,100,500,200
 WellA,2/29/24,95,480,210
 WellA,3/31/24,90,470,220
