@@ -81,13 +81,13 @@ def process_and_store_data():
         forecast_df = pd.read_csv(io.StringIO(st.session_state.forecast_data), sep='\t')
         downtime_df = pd.read_csv(io.StringIO(st.session_state.downtime_data), sep='\t')
         # Ensure columns match expectations
-        forecast_columns = ['well_name', 'date', 'oil_rate', 'gas_rate', 'water_rate']
+        forecast_columns = ['Well Name', 'date', 'oil_rate', 'gas_rate', 'water_rate']
         downtime_columns = ['Scenario', 'date', 'downtime_pct']
         for req in forecast_columns:
             if req not in forecast_df.columns:
-                forecast_df[req] = '' if req == 'well_name' or req == 'date' else None
+                forecast_df[req] = '' if req == 'Well Name' or req == 'date' else None
         forecast_df = forecast_df[forecast_columns]
-        forecast_df['well_name'] = forecast_df['well_name'].astype(str)
+        forecast_df['Well Name'] = forecast_df['Well Name'].astype(str)
         for req in downtime_columns:
             if req not in downtime_df.columns:
                 downtime_df[req] = '' if req == 'Scenario' or req == 'date' else None
@@ -99,8 +99,8 @@ def process_and_store_data():
             return False
         # Process each unique well independently
         st.session_state.processed_wells = {}
-        for well in forecast_df['well_name'].unique():
-            well_df = forecast_df[forecast_df['well_name'] == well].copy()
+        for well in forecast_df['Well Name'].unique():
+            well_df = forecast_df[forecast_df['Well Name'] == well].copy()
             # Defensive check for downtime scenario
             scenario = ''
             if not downtime_df.empty and 'Scenario' in downtime_df.columns and downtime_df['Scenario'].notnull().any():
