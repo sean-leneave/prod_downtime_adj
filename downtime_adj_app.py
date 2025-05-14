@@ -1804,7 +1804,7 @@ if st.session_state.processed_data is not None and 'processed_wells' in st.sessi
             excel_bytes, excel_filename = generate_selected_wells_excel()
             st.session_state.generated_export_bytes = excel_bytes
             st.session_state.generated_export_filename = excel_filename
-            st.rerun()
+            st.experimental_rerun()
     with export_col2:
         if (
             hasattr(st.session_state, 'generated_export_bytes') and
@@ -1850,7 +1850,7 @@ if st.session_state.processed_data is not None and 'processed_wells' in st.sessi
             zip_filename = f"Mosaic_Templates_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.zip"
             st.session_state.mosaic_zip_buffer = zip_buffer.getvalue()
             st.session_state.mosaic_zip_filename = zip_filename
-            st.rerun()
+            st.experimental_rerun()
     with mosaic_col2:
         if (
             hasattr(st.session_state, 'mosaic_zip_buffer') and 
