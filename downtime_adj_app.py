@@ -228,6 +228,8 @@ def process_and_store_data():
 
 def standardize_downtime_percentage(value: float) -> float:
     """Convert downtime percentage to decimal format if needed."""
+    if pd.isna(value):
+        return 0.0
     if value < 0 or value > 100:
         raise ValueError("Downtime percentage must be between 0 and 100")
     # Convert to decimal if in percentage format (0-100)
@@ -357,6 +359,14 @@ def process_input_data(forecast_data, downtime_data):
         # Sort by date
         forecast_df.sort_index(inplace=True)
         downtime_df.sort_index(inplace=True)
+        
+        # Fill any NaN values with zeros in numeric columns
+        for col in ['oil_rate', 'gas_rate', 'water_rate']:
+            if col in forecast_df.columns:
+                forecast_df[col] = forecast_df[col].fillna(0)
+        
+        if 'downtime_pct' in downtime_df.columns:
+            downtime_df['downtime_pct'] = downtime_df['downtime_pct'].fillna(0)
 
         return forecast_df, downtime_df
 
@@ -538,6 +548,10 @@ def process_batch_data(batch_data, downtime_data):
         # Process each well
         for well in unique_wells:
             well_df = batch_df[batch_df['well_name'] == well][['date', 'oil_rate', 'gas_rate', 'water_rate']]
+            # Fill NaN values with zeros
+            well_df['oil_rate'] = well_df['oil_rate'].fillna(0)
+            well_df['gas_rate'] = well_df['gas_rate'].fillna(0)
+            well_df['water_rate'] = well_df['water_rate'].fillna(0)
             well_df = well_df.set_index('date')
             well_df.sort_index(inplace=True)
             well_data[well] = well_df
@@ -1440,7 +1454,7 @@ with st.sidebar:
     st.markdown("""
         - Well Name
         - Date, monthly
-        - Oil Rate (bopd)
+        - Oil Rate (bopd) 
         - Gas Rate (mcfd)
         - Water Rate (bwpd)
         - Downtime Percentage (0-1 or 0-100)
@@ -1660,31 +1674,35 @@ with col1:
             ),
             "oil_rate": st.column_config.NumberColumn(
                 "Oil Rate (bopd)",
-                help="Enter oil rate in barrels per day",
+                help="Enter oil rate in barrels per day (leave blank for 0)",
                 min_value=0,
                 format="%d",
                 width="fixed",
-                default=None,
+                default=0,
             ),
             "gas_rate": st.column_config.NumberColumn(
                 "Gas Rate (mcfd)",
-                help="Enter gas rate in thousand cubic feet per day",
+                help="Enter gas rate in thousand cubic feet per day (leave blank for 0)",
                 min_value=0,
                 format="%d",
                 width="fixed",
-                default=None,
+                default=0,
             ),
             "water_rate": st.column_config.NumberColumn(
                 "Water Rate (bwpd)",
-                help="Enter water rate in barrels per day",
+                help="Enter water rate in barrels per day (leave blank for 0)",
                 min_value=0,
                 format="%d",
                 width="fixed",
-                default=None,
+                default=0,
             ),
         }
     )
+    # Replace NaN values with zeros in the rate columns before saving to session state
     if not edited_forecast_df.equals(forecast_df):
+        edited_forecast_df['oil_rate'] = edited_forecast_df['oil_rate'].fillna(0)
+        edited_forecast_df['gas_rate'] = edited_forecast_df['gas_rate'].fillna(0)
+        edited_forecast_df['water_rate'] = edited_forecast_df['water_rate'].fillna(0)
         st.session_state.forecast_data = edited_forecast_df.to_csv(sep='\t', index=False)
         forecast_df = edited_forecast_df.copy()
     st.markdown("<div class='upload-instruction'>Upload Excel file (.xlsx)</div>", unsafe_allow_html=True)
@@ -1763,6 +1781,10 @@ with col1:
                     st.session_state.forecast_data = df.to_csv(sep='\t', index=False)
                     # Refresh the table and show success message
                     st.success(f"Successfully loaded {len(df['Well Name'].unique())} wells.")
+                    # Fill NaN values with zeros before assigning
+                    df['oil_rate'] = df['oil_rate'].fillna(0)
+                    df['gas_rate'] = df['gas_rate'].fillna(0)
+                    df['water_rate'] = df['water_rate'].fillna(0)
                     forecast_df = df[required_cols]
         except Exception as e:
             st.error(f"Error reading Excel file: {str(e)}")
@@ -1835,16 +1857,18 @@ with col2:
             ),
             "downtime_pct": st.column_config.NumberColumn(
                 "Downtime Percentage",
-                help="Enter downtime percentage (0-100 or 0-1)",
+                help="Enter downtime percentage (0-100 or 0-1, leave blank for 0)",
                 min_value=0,
                 max_value=100,
                 format="%.2f",
                 width="fixed",
-                default=None,
+                default=0,
             ),
         }
     )
+    # Replace NaN values with zeros in the downtime_pct column before saving to session state
     if not edited_downtime_df.equals(downtime_df):
+        edited_downtime_df['downtime_pct'] = edited_downtime_df['downtime_pct'].fillna(0)
         st.session_state.downtime_data = edited_downtime_df.to_csv(sep='\t', index=False)
         downtime_df = edited_downtime_df.copy()
     st.markdown("<div class='upload-instruction'>Upload Excel file (.xlsx)</div>", unsafe_allow_html=True)
@@ -1915,6 +1939,8 @@ with col2:
                     st.session_state.downtime_data = df.to_csv(sep='\t', index=False)
                     # Refresh the table and show success message
                     st.success("Successfully loaded downtime data.")
+                    # Fill NaN values with zeros before assigning
+                    df['downtime_pct'] = df['downtime_pct'].fillna(0)
                     downtime_df = df[required_cols]
         except Exception as e:
             st.error(f"Error reading Excel file: {str(e)}")
