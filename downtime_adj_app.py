@@ -1636,11 +1636,11 @@ with col1:
             'Well Name': [well_name] * 6,
             'date': [''] * 6,
             'oil_rate': [None] * 6,
-            'gas_rate': [None] *6,
+            'gas_rate': [None] * 6,
             'water_rate': [None] * 6
         })
     # --- Forecast Table ---
-    # Always ensure forecast_df has exactly 6 rows
+    # Ensure forecast_df has at least 6 rows for initial display 
     if len(forecast_df) < 6:
         missing = 6 - len(forecast_df)
         add_df = pd.DataFrame({
@@ -1651,14 +1651,16 @@ with col1:
             'water_rate': [None] * missing
         })
         forecast_df = pd.concat([forecast_df, add_df], ignore_index=True)
-    elif len(forecast_df) > 6:
-        forecast_df = forecast_df.iloc[:6].copy()
+    # Remove the maximum row limit since we want scrolling
+    # but keep the initial rows setup
 
+    # Keep the 6 rows display but allow scrolling
     edited_forecast_df = st.data_editor(
         forecast_df,
-        num_rows="fixed",
+        num_rows="dynamic",  # Allow adding/removing rows
         use_container_width=True,
         hide_index=True,
+        height=240,  # Fixed height for 6 rows
         column_config={
             "Well Name": st.column_config.TextColumn(
                 "Well Name",
@@ -1825,7 +1827,9 @@ with col2:
             'downtime_pct': [None] * 6
         })
     # --- Downtime Table ---
-    # Always ensure downtime_df has exactly 6 rows
+    # Keep the code to ensure downtime_df has at least 6 rows initially
+    # --- Downtime Table ---
+    # Ensure downtime_df has at least 6 rows for initial display
     if len(downtime_df) < 6:
         missing = 6 - len(downtime_df)
         add_df = pd.DataFrame({
@@ -1834,14 +1838,16 @@ with col2:
             'downtime_pct': [None] * missing
         })
         downtime_df = pd.concat([downtime_df, add_df], ignore_index=True)
-    elif len(downtime_df) > 6:
-        downtime_df = downtime_df.iloc[:6].copy()
+    # Remove the maximum row limit since we want scrolling
+    # but keep the initial rows setup
 
+    # Always ensure downtime_df has exactly 6 visible rows but allow scrolling
     edited_downtime_df = st.data_editor(
         downtime_df,
-        num_rows="fixed",
+        num_rows="dynamic",  # Change from "fixed" to "dynamic"
         use_container_width=True,
         hide_index=True,
+        height=240,  # Fixed height for 6 rows
         column_config={
             "Scenario": st.column_config.TextColumn(
                 "Scenario",
