@@ -241,30 +241,44 @@ def process_batch_data(batch_data, downtime_data):
         # Print debug info about loaded columns
         st.info(f"Loaded batch data columns: {', '.join(batch_df.columns)}")
         
-        # Normalize column names: strip whitespace, lower-case
         if batch_df is not None and not batch_df.empty:
-            # Normalize column names to make matching more robust
-            batch_df.columns = [str(col).strip().lower() for col in batch_df.columns]
+            # Create a mapping of original columns to standard names
+            standard_columns = {
+                'well_name': ['well_name', 'well name', 'wellname', 'well', 'name', 'entity'],
+                'date': ['date'],
+                'oil_rate': ['oil_rate', 'oil rate', 'oilrate', 'oil'],
+                'gas_rate': ['gas_rate', 'gas rate', 'gasrate', 'gas'],
+                'water_rate': ['water_rate', 'water rate', 'waterrate', 'wtrrate', 'water', 'wtr']
+            }
             
-            # Map to required names - be more flexible with pattern matching
+            # Map columns to standard names
             col_map = {}
-            for col in batch_df.columns:
-                if any(pattern in col for pattern in ['well', 'name', 'wellname', 'entity']):
-                    col_map[col] = 'well_name'
-                elif col == 'date' or 'date' in col:
-                    col_map[col] = 'date'
-                elif any(pattern in col for pattern in ['oil', 'oilrate']):
-                    col_map[col] = 'oil_rate'
-                elif any(pattern in col for pattern in ['gas', 'gasrate']):
-                    col_map[col] = 'gas_rate'
-                elif any(pattern in col for pattern in ['water', 'waterrate', 'wtr', 'wtrrate']):
-                    col_map[col] = 'water_rate'
+            for std_col, patterns in standard_columns.items():
+                for col in batch_df.columns:
+                    # Check for exact match first
+                    col_lower = str(col).strip().lower()
+                    
+                    # First, check for exact match with any pattern
+                    if col_lower in patterns:
+                        col_map[col] = std_col
+                        break
+                    
+                    # Then check for partial matches
+                    for pattern in patterns:
+                        if pattern in col_lower:
+                            col_map[col] = std_col
+                            break
+                    
+                    # Break out of the loop if we've mapped this column
+                    if col in col_map:
+                        break
             
             # Report mapping for debugging
             if col_map:
                 mapping_info = ", ".join([f"{orig} → {new}" for orig, new in col_map.items()])
                 st.info(f"Column mapping: {mapping_info}")
                 
+            # Apply column mapping
             batch_df = batch_df.rename(columns=col_map)
             
         required_cols = ['well_name', 'date', 'oil_rate', 'gas_rate', 'water_rate']
@@ -287,6 +301,35 @@ def process_batch_data(batch_data, downtime_data):
         except Exception as e:
             st.error(f"Error parsing downtime data: {str(e)}\nPlease ensure data is tab-separated with proper headers.")
             return None, None, None
+
+        # Handle the downtime data columns using the same approach
+        if downtime_df is not None and not downtime_df.empty:
+            # Create a mapping of original columns to standard names for downtime
+            downtime_columns = {
+                'Scenario': ['scenario', 'scenario_name', 'case', 'name', 'downtime_scenario'],
+                'date': ['date'],
+                'downtime_pct': ['downtime_pct', 'downtime', 'dt_pct', 'dt', 'pct', 'percent', 'downtime_percent']
+            }
+            
+            # Map downtime columns to standard names
+            dt_col_map = {}
+            for std_col, patterns in downtime_columns.items():
+                for col in downtime_df.columns:
+                    col_lower = str(col).strip().lower()
+                    if col_lower in patterns:
+                        dt_col_map[col] = std_col
+                        break
+                    for pattern in patterns:
+                        if pattern in col_lower:
+                            dt_col_map[col] = std_col
+                            break
+                    if col in dt_col_map:
+                        break
+            
+            # Apply downtime column mapping
+            if dt_col_map:
+                st.info(f"Downtime column mapping: {', '.join([f'{orig} → {new}' for orig, new in dt_col_map.items()])}")
+                downtime_df = downtime_df.rename(columns=dt_col_map)
 
         # Check for required columns in downtime data
         if downtime_df is None or downtime_df.empty or 'date' not in downtime_df.columns or 'downtime_pct' not in downtime_df.columns:
@@ -1498,30 +1541,46 @@ with col1:
             # Print debug info about loaded columns
             st.info(f"Loaded columns: {', '.join(df.columns)}")
             
-            # Normalize column names to make matching more robust
-            df.columns = [str(col).strip().lower() for col in df.columns]
+            # Create a mapping of original columns to standard names
+            standard_columns = {
+                'Well Name': ['well_name', 'well name', 'wellname', 'well', 'name', 'entity'],
+                'date': ['date'],
+                'oil_rate': ['oil_rate', 'oil rate', 'oilrate', 'oil'],
+                'gas_rate': ['gas_rate', 'gas rate', 'gasrate', 'gas'],
+                'water_rate': ['water_rate', 'water rate', 'waterrate', 'wtrrate', 'water', 'wtr']
+            }
             
-            # Map to required names - be more flexible with pattern matching
+            # Map columns to standard names
             col_map = {}
-            for col in df.columns:
-                if any(pattern in col for pattern in ['well', 'name', 'wellname', 'entity']):
-                    col_map[col] = 'Well Name'
-                elif col == 'date' or 'date' in col:
-                    col_map[col] = 'date'
-                elif any(pattern in col for pattern in ['oil', 'oilrate']):
-                    col_map[col] = 'oil_rate'
-                elif any(pattern in col for pattern in ['gas', 'gasrate']):
-                    col_map[col] = 'gas_rate'
-                elif any(pattern in col for pattern in ['water', 'waterrate', 'wtr', 'wtrrate']):
-                    col_map[col] = 'water_rate'
+            for std_col, patterns in standard_columns.items():
+                for col in df.columns:
+                    # Check for exact match first
+                    col_lower = str(col).strip().lower()
+                    
+                    # First, check for exact match with any pattern
+                    if col_lower in patterns:
+                        col_map[col] = std_col
+                        break
+                    
+                    # Then check for partial matches
+                    for pattern in patterns:
+                        if pattern in col_lower:
+                            col_map[col] = std_col
+                            break
+                    
+                    # Break out of the loop if we've mapped this column
+                    if col in col_map:
+                        break
             
             # Report mapping for debugging
             if col_map:
                 mapping_info = ", ".join([f"{orig} → {new}" for orig, new in col_map.items()])
                 st.info(f"Column mapping: {mapping_info}")
                 
+            # Apply column mapping
             df = df.rename(columns=col_map)
             
+            # Add Well Name if missing and well_name is provided
             if 'Well Name' not in df.columns and well_name:
                 df.insert(0, 'Well Name', well_name)
             elif 'Well Name' in df.columns and well_name and (df['Well Name'].isnull().all() or (df['Well Name'] == '').all()):
@@ -1647,24 +1706,41 @@ with col2:
             # Print debug info about loaded columns
             st.info(f"Loaded downtime columns: {', '.join(df.columns)}")
             
-            # Normalize column names to make matching more robust
-            df.columns = [str(col).strip().lower() for col in df.columns]
+            # Create a mapping of original columns to standard names
+            standard_columns = {
+                'Scenario': ['scenario', 'scenario_name', 'case', 'name', 'downtime_scenario'],
+                'date': ['date'],
+                'downtime_pct': ['downtime_pct', 'downtime', 'dt_pct', 'dt', 'pct', 'percent', 'downtime_percent']
+            }
             
-            # Map to required names - be more flexible with pattern matching
+            # Map columns to standard names
             col_map = {}
-            for col in df.columns:
-                if any(pattern in col for pattern in ['scenario', 'case', 'name']):
-                    col_map[col] = 'Scenario'
-                elif col == 'date' or 'date' in col:
-                    col_map[col] = 'date'
-                elif any(pattern in col for pattern in ['downtime', 'dt', 'pct', 'percent']):
-                    col_map[col] = 'downtime_pct'
+            for std_col, patterns in standard_columns.items():
+                for col in df.columns:
+                    # Check for exact match first
+                    col_lower = str(col).strip().lower()
+                    
+                    # First, check for exact match with any pattern
+                    if col_lower in patterns:
+                        col_map[col] = std_col
+                        break
+                    
+                    # Then check for partial matches
+                    for pattern in patterns:
+                        if pattern in col_lower:
+                            col_map[col] = std_col
+                            break
+                    
+                    # Break out of the loop if we've mapped this column
+                    if col in col_map:
+                        break
             
             # Report mapping for debugging
             if col_map:
                 mapping_info = ", ".join([f"{orig} → {new}" for orig, new in col_map.items()])
                 st.info(f"Downtime column mapping: {mapping_info}")
                 
+            # Apply column mapping
             df = df.rename(columns=col_map)
             
         required_cols = ['Scenario', 'date', 'downtime_pct']
