@@ -15,6 +15,9 @@ from openpyxl import load_workbook
 from openpyxl.styles import Font, PatternFill
 
 # Constants
+# Add this right after the imports
+DEBUG_MODE = False  # Set to True to show debugging info messages
+
 COLORS = {
     'background': '#F8F9FA',
     'text': '#2C3E50',
@@ -87,7 +90,8 @@ def process_and_store_data():
             if len(forecast_df.columns) == 1:
                 # Try comma separator if tab didn't work
                 forecast_df = pd.read_csv(io.StringIO(st.session_state.forecast_data), sep=',')
-                st.info("Detected comma-separated values for forecast data.")
+                if DEBUG_MODE:
+                    st.info("Detected comma-separated values for forecast data.")
         except Exception as e:
             st.error(f"Error parsing forecast data: {str(e)}")
             return False
@@ -97,13 +101,15 @@ def process_and_store_data():
             if len(downtime_df.columns) == 1:
                 # Try comma separator if tab didn't work
                 downtime_df = pd.read_csv(io.StringIO(st.session_state.downtime_data), sep=',')
-                st.info("Detected comma-separated values for downtime data.")
+                if DEBUG_MODE:
+                    st.info("Detected comma-separated values for downtime data.")
         except Exception as e:
             st.error(f"Error parsing downtime data: {str(e)}")
             return False
             
         # Print loaded columns for debugging
-        st.info(f"Loaded forecast columns: {', '.join(forecast_df.columns)}")
+        if DEBUG_MODE:
+            st.info(f"Loaded forecast columns: {', '.join(forecast_df.columns)}")
         
         # Handle column mapping for forecast data
         standard_columns = {
@@ -140,7 +146,7 @@ def process_and_store_data():
                     break
         
         # Report mapping for debugging
-        if col_map:
+        if col_map and DEBUG_MODE:
             mapping_info = ", ".join([f"{orig} → {new}" for orig, new in col_map.items()])
             st.info(f"Column mapping: {mapping_info}")
             
@@ -158,7 +164,8 @@ def process_and_store_data():
             
         if missing_cols:
             st.error(f"Forecast file is missing required columns: {', '.join(missing_cols)}. Please check your file.")
-            st.info(f"Available columns: {', '.join(forecast_df.columns)}")
+            if DEBUG_MODE:
+                st.info(f"Available columns: {', '.join(forecast_df.columns)}")
             return False
             
         # Handle similar mapping for downtime data if needed
@@ -241,7 +248,8 @@ def process_input_data(forecast_data, downtime_data):
             if len(forecast_df.columns) == 1:
                 # Try comma separator if tab didn't work
                 forecast_df = pd.read_csv(io.StringIO(forecast_data), sep=',')
-                st.info("Detected comma-separated values for forecast data instead of tabs. Processing anyway.")
+                if DEBUG_MODE:
+                    st.info("Detected comma-separated values for forecast data instead of tabs. Processing anyway.")
         except Exception as e:
             st.error(f"Error parsing forecast data: {str(e)}\nPlease ensure data is tab-separated with proper headers.")
             return None, None
@@ -251,13 +259,15 @@ def process_input_data(forecast_data, downtime_data):
             if len(downtime_df.columns) == 1:
                 # Try comma separator if tab didn't work
                 downtime_df = pd.read_csv(io.StringIO(downtime_data), sep=',')
-                st.info("Detected comma-separated values for downtime data instead of tabs. Processing anyway.")
+                if DEBUG_MODE:
+                    st.info("Detected comma-separated values for downtime data instead of tabs. Processing anyway.")
         except Exception as e:
             st.error(f"Error parsing downtime data: {str(e)}\nPlease ensure data is tab-separated with proper headers.")
             return None, None
 
         # Print loaded columns for debugging
-        st.info(f"Loaded columns: {', '.join(forecast_df.columns)}")
+        if DEBUG_MODE:
+            st.info(f"Loaded columns: {', '.join(forecast_df.columns)}")
         
         # Handle column mapping for forecast data
         standard_columns = {
@@ -294,7 +304,7 @@ def process_input_data(forecast_data, downtime_data):
                     break
         
         # Report mapping for debugging
-        if col_map:
+        if col_map and DEBUG_MODE:
             mapping_info = ", ".join([f"{orig} → {new}" for orig, new in col_map.items()])
             st.info(f"Column mapping: {mapping_info}")
             
@@ -312,7 +322,8 @@ def process_input_data(forecast_data, downtime_data):
             
         if missing_cols:
             st.error(f"Forecast file is missing required columns: {', '.join(missing_cols)}. Please check your file.")
-            st.info(f"Available columns: {', '.join(forecast_df.columns)}")
+            if DEBUG_MODE:
+                st.info(f"Available columns: {', '.join(forecast_df.columns)}")
             return None, None
 
         # Check for required columns
@@ -365,13 +376,15 @@ def process_batch_data(batch_data, downtime_data):
             batch_df = pd.read_csv(io.StringIO(batch_data), sep='\t')
             if len(batch_df.columns) == 1:
                 batch_df = pd.read_csv(io.StringIO(batch_data), sep=',')
-                st.info("Detected comma-separated values for batch data.")
+                if DEBUG_MODE:
+                    st.info("Detected comma-separated values for batch data.")
         except Exception as e:
             st.error(f"Error parsing batch data: {str(e)}\nPlease ensure data is tab-separated with proper headers.")
             return None, None, None
 
         # Print debug info about loaded columns
-        st.info(f"Loaded batch data columns: {', '.join(batch_df.columns)}")
+        if DEBUG_MODE:
+            st.info(f"Loaded batch data columns: {', '.join(batch_df.columns)}")
         
         if batch_df is not None and not batch_df.empty:
             # Create a mapping of original columns to standard names
@@ -411,7 +424,7 @@ def process_batch_data(batch_data, downtime_data):
                         break
             
             # Report mapping for debugging
-            if col_map:
+            if col_map and DEBUG_MODE:
                 mapping_info = ", ".join([f"{orig} → {new}" for orig, new in col_map.items()])
                 st.info(f"Column mapping: {mapping_info}")
                 
@@ -429,7 +442,8 @@ def process_batch_data(batch_data, downtime_data):
             
             if missing_cols:
                 st.error(f"Batch forecast file is missing required columns: {', '.join(missing_cols)}. Please check your file.")
-                st.info(f"Available columns: {', '.join(batch_df.columns)}")
+                if DEBUG_MODE:
+                    st.info(f"Available columns: {', '.join(batch_df.columns)}")
                 return None, None, None
 
         if batch_df is None or batch_df.empty:
@@ -440,7 +454,8 @@ def process_batch_data(batch_data, downtime_data):
             downtime_df = pd.read_csv(io.StringIO(downtime_data), sep='\t')
             if len(downtime_df.columns) == 1:
                 downtime_df = pd.read_csv(io.StringIO(downtime_data), sep=',')
-                st.info("Detected comma-separated values for downtime data.")
+                if DEBUG_MODE:
+                    st.info("Detected comma-separated values for downtime data.")
         except Exception as e:
             st.error(f"Error parsing downtime data: {str(e)}\nPlease ensure data is tab-separated with proper headers.")
             return None, None, None
@@ -484,7 +499,7 @@ def process_batch_data(batch_data, downtime_data):
             # Apply downtime column mapping
             if dt_col_map:
                 mapping_info = ", ".join([f"{orig} → {new}" for orig, new in dt_col_map.items()])
-                st.info(f"Downtime column mapping: {mapping_info}")
+                # st.info(f"Downtime column mapping: {mapping_info}")
                 downtime_df = downtime_df.rename(columns=dt_col_map)
 
         # Check for required columns in downtime data
@@ -1682,12 +1697,14 @@ with col1:
                 df = pd.read_csv(uploaded_file, sep='\t')
                 if len(df.columns) == 1:
                     df = pd.read_csv(uploaded_file, sep=',')
-                    st.info("Detected comma-separated values for forecast data instead of tabs. Processing anyway.")
+                    if DEBUG_MODE:
+                        st.info("Detected comma-separated values for forecast data instead of tabs. Processing anyway.")
             except Exception as e:
                 st.error(f"Error parsing CSV file: {str(e)}")
                 try:
                     df = pd.read_csv(uploaded_file, sep=',')
-                    st.info("Trying with comma separator instead.")
+                    if DEBUG_MODE:
+                        st.info("Trying with comma separator instead.")
                 except Exception as e2:
                     st.error(f"Also failed with comma separator: {str(e2)}")
         elif uploaded_file.name.endswith(('.xlsx', '.xls')):
@@ -1695,7 +1712,7 @@ with col1:
         
         if df is not None and not df.empty:
             # Print debug info about loaded columns
-            st.info(f"Loaded columns: {', '.join(df.columns)}")
+            # st.info(f"Loaded columns: {', '.join(df.columns)}")
             
             # Create a mapping of original columns to standard names
             standard_columns = {
@@ -1735,7 +1752,7 @@ with col1:
                         break
             
             # Report mapping for debugging
-            if col_map:
+            if col_map and DEBUG_MODE:
                 mapping_info = ", ".join([f"{orig} → {new}" for orig, new in col_map.items()])
                 st.info(f"Column mapping: {mapping_info}")
                 
@@ -1745,7 +1762,8 @@ with col1:
             # Add Well Name if missing and well_name is provided
             if 'Well Name' not in df.columns and 'well_name' in df.columns:
                 df['Well Name'] = df['well_name']
-                st.info("Mapped 'well_name' to 'Well Name'")
+                if DEBUG_MODE:
+                    st.info("Mapped 'well_name' to 'Well Name'")
             elif 'Well Name' not in df.columns and well_name:
                 df.insert(0, 'Well Name', well_name)
             elif 'Well Name' in df.columns and well_name and (df['Well Name'].isnull().all() or (df['Well Name'] == '').all()):
@@ -1756,7 +1774,8 @@ with col1:
         
         if missing_cols:
             st.error(f"Forecast file is missing required columns: {', '.join(missing_cols)}. Please check your file.")
-            st.info(f"Available columns: {', '.join(df.columns)}")
+            if DEBUG_MODE:
+                st.info(f"Available columns: {', '.join(df.columns)}")
         elif df is None or df.empty:
             st.error("Forecast file is empty. Please check your file.")
         else:
@@ -1856,12 +1875,14 @@ with col2:
                 df = pd.read_csv(uploaded_downtime, sep='\t')
                 if len(df.columns) == 1:
                     df = pd.read_csv(uploaded_downtime, sep=',')
-                    st.info("Detected comma-separated values for downtime data instead of tabs. Processing anyway.")
+                    if DEBUG_MODE:
+                        st.info("Detected comma-separated values for downtime data instead of tabs. Processing anyway.")
             except Exception as e:
                 st.error(f"Error parsing CSV file: {str(e)}")
                 try:
                     df = pd.read_csv(uploaded_downtime, sep=',')
-                    st.info("Trying with comma separator instead.")
+                    if DEBUG_MODE:
+                        st.info("Trying with comma separator instead.")
                 except Exception as e2:
                     st.error(f"Also failed with comma separator: {str(e2)}")
         elif uploaded_downtime.name.endswith(('.xlsx', '.xls')):
@@ -1869,7 +1890,7 @@ with col2:
             
         if df is not None and not df.empty:
             # Print debug info about loaded columns
-            st.info(f"Loaded downtime columns: {', '.join(df.columns)}")
+            # st.info(f"Loaded downtime columns: {', '.join(df.columns)}")
             
             # Create a mapping of original columns to standard names
             standard_columns = {
@@ -1907,7 +1928,7 @@ with col2:
                         break
             
             # Report mapping for debugging
-            if col_map:
+            if col_map and DEBUG_MODE:
                 mapping_info = ", ".join([f"{orig} → {new}" for orig, new in col_map.items()])
                 st.info(f"Downtime column mapping: {mapping_info}")
                 
@@ -1923,7 +1944,8 @@ with col2:
         
         if missing_cols:
             st.error(f"Downtime file is missing required columns: {', '.join(missing_cols)}. Please check your file.")
-            st.info(f"Available columns: {', '.join(df.columns)}")
+            if DEBUG_MODE:
+                st.info(f"Available columns: {', '.join(df.columns)}")
         elif df is None or df.empty:
             st.error("Downtime file is empty. Please check your file.")
         else:
