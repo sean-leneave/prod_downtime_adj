@@ -228,6 +228,8 @@ def process_and_store_data():
 
 def standardize_downtime_percentage(value: float) -> float:
     """Convert downtime percentage to decimal format if needed."""
+    if pd.isna(value):
+        return 0.0
     if value < 0 or value > 100:
         raise ValueError("Downtime percentage must be between 0 and 100")
     # Convert to decimal if in percentage format (0-100)
@@ -357,6 +359,14 @@ def process_input_data(forecast_data, downtime_data):
         # Sort by date
         forecast_df.sort_index(inplace=True)
         downtime_df.sort_index(inplace=True)
+        
+        # Fill any NaN values with zeros in numeric columns
+        for col in ['oil_rate', 'gas_rate', 'water_rate']:
+            if col in forecast_df.columns:
+                forecast_df[col] = forecast_df[col].fillna(0)
+        
+        if 'downtime_pct' in downtime_df.columns:
+            downtime_df['downtime_pct'] = downtime_df['downtime_pct'].fillna(0)
 
         return forecast_df, downtime_df
 
@@ -538,6 +548,10 @@ def process_batch_data(batch_data, downtime_data):
         # Process each well
         for well in unique_wells:
             well_df = batch_df[batch_df['well_name'] == well][['date', 'oil_rate', 'gas_rate', 'water_rate']]
+            # Fill NaN values with zeros
+            well_df['oil_rate'] = well_df['oil_rate'].fillna(0)
+            well_df['gas_rate'] = well_df['gas_rate'].fillna(0)
+            well_df['water_rate'] = well_df['water_rate'].fillna(0)
             well_df = well_df.set_index('date')
             well_df.sort_index(inplace=True)
             well_data[well] = well_df
@@ -1440,27 +1454,27 @@ with st.sidebar:
     st.markdown("""
         - Well Name
         - Date, monthly
-        - Oil Rate (bopd)
+        - Oil Rate (bopd) 
         - Gas Rate (mcfd)
         - Water Rate (bwpd)
         - Downtime Percentage (0-1 or 0-100)
     """)
     # Add template download buttons
     st.markdown('<div class="sidebar-center">', unsafe_allow_html=True)
-    with open("template_production_forecast.csv", "rb") as f:
+    with open("template_production_forecast.xlsx", "rb") as f:
         st.download_button(
             label="Production Forecast Template",
             data=f.read(),
-            file_name="template_production_forecast.csv",
-            mime="text/csv",
+            file_name="template_production_forecast.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             key="sidebar_prod_template_btn"
         )
-    with open("template_downtime_forecast.csv", "rb") as f:
+    with open("template_downtime_forecast.xlsx", "rb") as f:
         st.download_button(
             label="Downtime Forecast Template",
             data=f.read(),
-            file_name="template_downtime_forecast.csv",
-            mime="text/csv",
+            file_name="template_downtime_forecast.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             key="sidebar_dt_template_btn"
         )
     if st.button("📚 View Documentation", use_container_width=True, key="sidebar_doc_btn"):
@@ -1622,11 +1636,11 @@ with col1:
             'Well Name': [well_name] * 6,
             'date': [''] * 6,
             'oil_rate': [None] * 6,
-            'gas_rate': [None] *6,
+            'gas_rate': [None] * 6,
             'water_rate': [None] * 6
         })
     # --- Forecast Table ---
-    # Always ensure forecast_df has exactly 6 rows
+    # Ensure forecast_df has at least 6 rows for initial display 
     if len(forecast_df) < 6:
         missing = 6 - len(forecast_df)
         add_df = pd.DataFrame({
@@ -1637,14 +1651,16 @@ with col1:
             'water_rate': [None] * missing
         })
         forecast_df = pd.concat([forecast_df, add_df], ignore_index=True)
-    elif len(forecast_df) > 6:
-        forecast_df = forecast_df.iloc[:6].copy()
+    # Remove the maximum row limit since we want scrolling
+    # but keep the initial rows setup
 
+    # Keep the 6 rows display but allow scrolling
     edited_forecast_df = st.data_editor(
         forecast_df,
-        num_rows="fixed",
+        num_rows="dynamic",  # Allow adding/removing rows
         use_container_width=True,
         hide_index=True,
+        height=240,  # Fixed height for 6 rows
         column_config={
             "Well Name": st.column_config.TextColumn(
                 "Well Name",
@@ -1660,130 +1676,120 @@ with col1:
             ),
             "oil_rate": st.column_config.NumberColumn(
                 "Oil Rate (bopd)",
-                help="Enter oil rate in barrels per day",
+                help="Enter oil rate in barrels per day (leave blank for 0)",
                 min_value=0,
                 format="%d",
                 width="fixed",
-                default=None,
+                default=0,
             ),
             "gas_rate": st.column_config.NumberColumn(
                 "Gas Rate (mcfd)",
-                help="Enter gas rate in thousand cubic feet per day",
+                help="Enter gas rate in thousand cubic feet per day (leave blank for 0)",
                 min_value=0,
                 format="%d",
                 width="fixed",
-                default=None,
+                default=0,
             ),
             "water_rate": st.column_config.NumberColumn(
                 "Water Rate (bwpd)",
-                help="Enter water rate in barrels per day",
+                help="Enter water rate in barrels per day (leave blank for 0)",
                 min_value=0,
                 format="%d",
                 width="fixed",
-                default=None,
+                default=0,
             ),
         }
     )
+    # Replace NaN values with zeros in the rate columns before saving to session state
     if not edited_forecast_df.equals(forecast_df):
+        edited_forecast_df['oil_rate'] = edited_forecast_df['oil_rate'].fillna(0)
+        edited_forecast_df['gas_rate'] = edited_forecast_df['gas_rate'].fillna(0)
+        edited_forecast_df['water_rate'] = edited_forecast_df['water_rate'].fillna(0)
         st.session_state.forecast_data = edited_forecast_df.to_csv(sep='\t', index=False)
         forecast_df = edited_forecast_df.copy()
-    st.markdown("<div class='upload-instruction'>Upload CSV or Excel file</div>", unsafe_allow_html=True)
-    uploaded_file = st.file_uploader("Upload file", type=['csv', 'xlsx', 'xls'], key="forecast_uploader", label_visibility="collapsed")
+    st.markdown("<div class='upload-instruction'>Upload Excel file (.xlsx)</div>", unsafe_allow_html=True)
+    uploaded_file = st.file_uploader("Upload file", type=['xlsx'], key="forecast_uploader", label_visibility="collapsed")
     # --- NEW: Process file upload immediately ---
     if uploaded_file is not None:
-        df = None
-        if uploaded_file.name.endswith('.csv'):
-            try:
-                df = pd.read_csv(uploaded_file, sep='\t')
-                if len(df.columns) == 1:
-                    df = pd.read_csv(uploaded_file, sep=',')
-                    if DEBUG_MODE:
-                        st.info("Detected comma-separated values for forecast data instead of tabs. Processing anyway.")
-            except Exception as e:
-                st.error(f"Error parsing CSV file: {str(e)}")
-                try:
-                    df = pd.read_csv(uploaded_file, sep=',')
-                    if DEBUG_MODE:
-                        st.info("Trying with comma separator instead.")
-                except Exception as e2:
-                    st.error(f"Also failed with comma separator: {str(e2)}")
-        elif uploaded_file.name.endswith(('.xlsx', '.xls')):
+        try:
             df = pd.read_excel(uploaded_file)
-        
-        if df is not None and not df.empty:
-            # Print debug info about loaded columns
-            # st.info(f"Loaded columns: {', '.join(df.columns)}")
             
-            # Create a mapping of original columns to standard names
-            standard_columns = {
-                'Well Name': ['well_name', 'well name', 'wellname', 'well', 'name', 'entity', 'Well Name'],
-                'date': ['date', 'Date'],
-                'oil_rate': ['oil_rate', 'oil rate', 'oilrate', 'oil', 'Oil Rate'],
-                'gas_rate': ['gas_rate', 'gas rate', 'gasrate', 'gas', 'Gas Rate'],
-                'water_rate': ['water_rate', 'water rate', 'waterrate', 'wtrrate', 'water', 'wtr', 'Water Rate']
-            }
-            
-            # Preserve original column names for reporting
-            orig_columns = list(df.columns)
-            
-            # Create a normalized version of columns for matching (strip, lowercase)
-            normalized_columns = [str(col).strip().lower() for col in df.columns]
-            
-            # Map columns to standard names
-            col_map = {}
-            for std_col, patterns in standard_columns.items():
-                for i, col_lower in enumerate(normalized_columns):
-                    orig_col = orig_columns[i]
-                    
-                    # First, check for exact match with any pattern
-                    if col_lower in [p.lower() for p in patterns]:
-                        col_map[orig_col] = std_col
-                        break
-                    
-                    # Then check for partial matches (skip if already mapped)
-                    if orig_col not in col_map:
-                        for pattern in patterns:
-                            if pattern.lower() in col_lower:
-                                col_map[orig_col] = std_col
-                                break
-                    
-                    # Break out of the loop if we've mapped this column
-                    if orig_col in col_map:
-                        break
-            
-            # Report mapping for debugging
-            if col_map and DEBUG_MODE:
-                mapping_info = ", ".join([f"{orig} → {new}" for orig, new in col_map.items()])
-                st.info(f"Column mapping: {mapping_info}")
+            if df is not None and not df.empty:
+                # Create a mapping of original columns to standard names
+                standard_columns = {
+                    'Well Name': ['well_name', 'well name', 'wellname', 'well', 'name', 'entity', 'Well Name'],
+                    'date': ['date', 'Date'],
+                    'oil_rate': ['oil_rate', 'oil rate', 'oilrate', 'oil', 'Oil Rate'],
+                    'gas_rate': ['gas_rate', 'gas rate', 'gasrate', 'gas', 'Gas Rate'],
+                    'water_rate': ['water_rate', 'water rate', 'waterrate', 'wtrrate', 'water', 'wtr', 'Water Rate']
+                }
                 
-            # Apply column mapping
-            df = df.rename(columns=col_map)
-            
-            # Add Well Name if missing and well_name is provided
-            if 'Well Name' not in df.columns and 'well_name' in df.columns:
-                df['Well Name'] = df['well_name']
-                if DEBUG_MODE:
-                    st.info("Mapped 'well_name' to 'Well Name'")
-            elif 'Well Name' not in df.columns and well_name:
-                df.insert(0, 'Well Name', well_name)
-            elif 'Well Name' in df.columns and well_name and (df['Well Name'].isnull().all() or (df['Well Name'] == '').all()):
-                df['Well Name'] = well_name
+                # Preserve original column names for reporting
+                orig_columns = list(df.columns)
                 
-        required_cols = ['Well Name', 'date', 'oil_rate', 'gas_rate', 'water_rate']
-        missing_cols = [col for col in required_cols if col not in df.columns]
-        
-        if missing_cols:
-            st.error(f"Forecast file is missing required columns: {', '.join(missing_cols)}. Please check your file.")
-            if DEBUG_MODE:
-                st.info(f"Available columns: {', '.join(df.columns)}")
-        elif df is None or df.empty:
-            st.error("Forecast file is empty. Please check your file.")
-        else:
-            st.session_state.forecast_data = df.to_csv(sep='\t', index=False)
-            # Refresh the table and show success message
-            st.success(f"Successfully loaded {len(df['Well Name'].unique())} wells.")
-            forecast_df = df[required_cols]
-    # --- NEW: Process file upload immediately ---
+                # Create a normalized version of columns for matching (strip, lowercase)
+                normalized_columns = [str(col).strip().lower() for col in df.columns]
+                
+                # Map columns to standard names
+                col_map = {}
+                for std_col, patterns in standard_columns.items():
+                    for i, col_lower in enumerate(normalized_columns):
+                        orig_col = orig_columns[i]
+                        
+                        # First, check for exact match with any pattern
+                        if col_lower in [p.lower() for p in patterns]:
+                            col_map[orig_col] = std_col
+                            break
+                        
+                        # Then check for partial matches (skip if already mapped)
+                        if orig_col not in col_map:
+                            for pattern in patterns:
+                                if pattern.lower() in col_lower:
+                                    col_map[orig_col] = std_col
+                                    break
+                        
+                        # Break out of the loop if we've mapped this column
+                        if orig_col in col_map:
+                            break
+                
+                # Report mapping for debugging
+                if col_map and DEBUG_MODE:
+                    mapping_info = ", ".join([f"{orig} → {new}" for orig, new in col_map.items()])
+                    st.info(f"Column mapping: {mapping_info}")
+                    
+                # Apply column mapping
+                df = df.rename(columns=col_map)
+                
+                # Add Well Name if missing and well_name is provided
+                if 'Well Name' not in df.columns and 'well_name' in df.columns:
+                    df['Well Name'] = df['well_name']
+                    if DEBUG_MODE:
+                        st.info("Mapped 'well_name' to 'Well Name'")
+                elif 'Well Name' not in df.columns and well_name:
+                    df.insert(0, 'Well Name', well_name)
+                elif 'Well Name' in df.columns and well_name and (df['Well Name'].isnull().all() or (df['Well Name'] == '').all()):
+                    df['Well Name'] = well_name
+                    
+                required_cols = ['Well Name', 'date', 'oil_rate', 'gas_rate', 'water_rate']
+                missing_cols = [col for col in required_cols if col not in df.columns]
+                
+                if missing_cols:
+                    st.error(f"Forecast file is missing required columns: {', '.join(missing_cols)}. Please check your file.")
+                    if DEBUG_MODE:
+                        st.info(f"Available columns: {', '.join(df.columns)}")
+                elif df.empty:
+                    st.error("Forecast file is empty. Please check your file.")
+                else:
+                    st.session_state.forecast_data = df.to_csv(sep='\t', index=False)
+                    # Refresh the table and show success message
+                    st.success(f"Successfully loaded {len(df['Well Name'].unique())} wells.")
+                    # Fill NaN values with zeros before assigning
+                    df['oil_rate'] = df['oil_rate'].fillna(0)
+                    df['gas_rate'] = df['gas_rate'].fillna(0)
+                    df['water_rate'] = df['water_rate'].fillna(0)
+                    forecast_df = df[required_cols]
+        except Exception as e:
+            st.error(f"Error reading Excel file: {str(e)}")
 
 with col2:
     st.subheader("Downtime Forecast Input")
@@ -1821,7 +1827,9 @@ with col2:
             'downtime_pct': [None] * 6
         })
     # --- Downtime Table ---
-    # Always ensure downtime_df has exactly 6 rows
+    # Keep the code to ensure downtime_df has at least 6 rows initially
+    # --- Downtime Table ---
+    # Ensure downtime_df has at least 6 rows for initial display
     if len(downtime_df) < 6:
         missing = 6 - len(downtime_df)
         add_df = pd.DataFrame({
@@ -1830,14 +1838,16 @@ with col2:
             'downtime_pct': [None] * missing
         })
         downtime_df = pd.concat([downtime_df, add_df], ignore_index=True)
-    elif len(downtime_df) > 6:
-        downtime_df = downtime_df.iloc[:6].copy()
+    # Remove the maximum row limit since we want scrolling
+    # but keep the initial rows setup
 
+    # Always ensure downtime_df has exactly 6 visible rows but allow scrolling
     edited_downtime_df = st.data_editor(
         downtime_df,
-        num_rows="fixed",
+        num_rows="dynamic",  # Change from "fixed" to "dynamic"
         use_container_width=True,
         hide_index=True,
+        height=240,  # Fixed height for 6 rows
         column_config={
             "Scenario": st.column_config.TextColumn(
                 "Scenario",
@@ -1853,106 +1863,93 @@ with col2:
             ),
             "downtime_pct": st.column_config.NumberColumn(
                 "Downtime Percentage",
-                help="Enter downtime percentage (0-100 or 0-1)",
+                help="Enter downtime percentage (0-100 or 0-1, leave blank for 0)",
                 min_value=0,
                 max_value=100,
                 format="%.2f",
                 width="fixed",
-                default=None,
+                default=0,
             ),
         }
     )
+    # Replace NaN values with zeros in the downtime_pct column before saving to session state
     if not edited_downtime_df.equals(downtime_df):
+        edited_downtime_df['downtime_pct'] = edited_downtime_df['downtime_pct'].fillna(0)
         st.session_state.downtime_data = edited_downtime_df.to_csv(sep='\t', index=False)
         downtime_df = edited_downtime_df.copy()
-    st.markdown("<div class='upload-instruction'>Upload CSV or Excel file</div>", unsafe_allow_html=True)
-    uploaded_downtime = st.file_uploader("Upload file", type=['csv', 'xlsx', 'xls'], key="downtime_uploader", label_visibility="collapsed")
+    st.markdown("<div class='upload-instruction'>Upload Excel file (.xlsx)</div>", unsafe_allow_html=True)
+    uploaded_downtime = st.file_uploader("Upload file", type=['xlsx'], key="downtime_uploader", label_visibility="collapsed")
     # --- NEW: Process downtime file upload immediately ---
     if uploaded_downtime is not None:
-        df = None
-        if uploaded_downtime.name.endswith('.csv'):
-            try:
-                df = pd.read_csv(uploaded_downtime, sep='\t')
-                if len(df.columns) == 1:
-                    df = pd.read_csv(uploaded_downtime, sep=',')
-                    if DEBUG_MODE:
-                        st.info("Detected comma-separated values for downtime data instead of tabs. Processing anyway.")
-            except Exception as e:
-                st.error(f"Error parsing CSV file: {str(e)}")
-                try:
-                    df = pd.read_csv(uploaded_downtime, sep=',')
-                    if DEBUG_MODE:
-                        st.info("Trying with comma separator instead.")
-                except Exception as e2:
-                    st.error(f"Also failed with comma separator: {str(e2)}")
-        elif uploaded_downtime.name.endswith(('.xlsx', '.xls')):
+        try:
             df = pd.read_excel(uploaded_downtime)
             
-        if df is not None and not df.empty:
-            # Print debug info about loaded columns
-            # st.info(f"Loaded downtime columns: {', '.join(df.columns)}")
-            
-            # Create a mapping of original columns to standard names
-            standard_columns = {
-                'Scenario': ['scenario', 'scenario_name', 'case', 'name', 'downtime_scenario', 'Scenario'],
-                'date': ['date', 'Date'],
-                'downtime_pct': ['downtime_pct', 'downtime', 'dt_pct', 'dt', 'pct', 'percent', 'downtime_percent']
-            }
-            
-            # Preserve original column names for reporting
-            orig_columns = list(df.columns)
-            
-            # Create a normalized version of columns for matching (strip, lowercase)
-            normalized_columns = [str(col).strip().lower() for col in df.columns]
-            
-            # Map columns to standard names
-            col_map = {}
-            for std_col, patterns in standard_columns.items():
-                for i, col_lower in enumerate(normalized_columns):
-                    orig_col = orig_columns[i]
-                    
-                    # First, check for exact match with any pattern
-                    if col_lower in [p.lower() for p in patterns]:
-                        col_map[orig_col] = std_col
-                        break
-                    
-                    # Then check for partial matches (skip if already mapped)
-                    if orig_col not in col_map:
-                        for pattern in patterns:
-                            if pattern.lower() in col_lower:
-                                col_map[orig_col] = std_col
-                                break
-                    
-                    # Break out of the loop if we've mapped this column
-                    if orig_col in col_map:
-                        break
-            
-            # Report mapping for debugging
-            if col_map and DEBUG_MODE:
-                mapping_info = ", ".join([f"{orig} → {new}" for orig, new in col_map.items()])
-                st.info(f"Downtime column mapping: {mapping_info}")
+            if df is not None and not df.empty:
+                # Create a mapping of original columns to standard names
+                standard_columns = {
+                    'Scenario': ['scenario', 'scenario_name', 'case', 'name', 'downtime_scenario', 'Scenario'],
+                    'date': ['date', 'Date'],
+                    'downtime_pct': ['downtime_pct', 'downtime', 'dt_pct', 'dt', 'pct', 'percent', 'downtime_percent']
+                }
                 
-            # Apply column mapping
-            df = df.rename(columns=col_map)
-            
-            # Add Scenario if missing
-            if 'Scenario' not in df.columns and scenario_name:
-                df.insert(0, 'Scenario', scenario_name)
+                # Preserve original column names for reporting
+                orig_columns = list(df.columns)
                 
-        required_cols = ['Scenario', 'date', 'downtime_pct']
-        missing_cols = [col for col in required_cols if col not in df.columns]
-        
-        if missing_cols:
-            st.error(f"Downtime file is missing required columns: {', '.join(missing_cols)}. Please check your file.")
-            if DEBUG_MODE:
-                st.info(f"Available columns: {', '.join(df.columns)}")
-        elif df is None or df.empty:
-            st.error("Downtime file is empty. Please check your file.")
-        else:
-            st.session_state.downtime_data = df.to_csv(sep='\t', index=False)
-            # Refresh the table and show success message
-            st.success("Successfully loaded downtime.")
-            downtime_df = df[required_cols]
+                # Create a normalized version of columns for matching (strip, lowercase)
+                normalized_columns = [str(col).strip().lower() for col in df.columns]
+                
+                # Map columns to standard names
+                col_map = {}
+                for std_col, patterns in standard_columns.items():
+                    for i, col_lower in enumerate(normalized_columns):
+                        orig_col = orig_columns[i]
+                        
+                        # First, check for exact match with any pattern
+                        if col_lower in [p.lower() for p in patterns]:
+                            col_map[orig_col] = std_col
+                            break
+                        
+                        # Then check for partial matches (skip if already mapped)
+                        if orig_col not in col_map:
+                            for pattern in patterns:
+                                if pattern.lower() in col_lower:
+                                    col_map[orig_col] = std_col
+                                    break
+                        
+                        # Break out of the loop if we've mapped this column
+                        if orig_col in col_map:
+                            break
+                
+                # Report mapping for debugging
+                if col_map and DEBUG_MODE:
+                    mapping_info = ", ".join([f"{orig} → {new}" for orig, new in col_map.items()])
+                    st.info(f"Downtime column mapping: {mapping_info}")
+                    
+                # Apply column mapping
+                df = df.rename(columns=col_map)
+                
+                # Add Scenario if missing
+                if 'Scenario' not in df.columns and scenario_name:
+                    df.insert(0, 'Scenario', scenario_name)
+                    
+                required_cols = ['Scenario', 'date', 'downtime_pct']
+                missing_cols = [col for col in required_cols if col not in df.columns]
+                
+                if missing_cols:
+                    st.error(f"Downtime file is missing required columns: {', '.join(missing_cols)}. Please check your file.")
+                    if DEBUG_MODE:
+                        st.info(f"Available columns: {', '.join(df.columns)}")
+                elif df.empty:
+                    st.error("Downtime file is empty. Please check your file.")
+                else:
+                    st.session_state.downtime_data = df.to_csv(sep='\t', index=False)
+                    # Refresh the table and show success message
+                    st.success("Successfully loaded downtime data.")
+                    # Fill NaN values with zeros before assigning
+                    df['downtime_pct'] = df['downtime_pct'].fillna(0)
+                    downtime_df = df[required_cols]
+        except Exception as e:
+            st.error(f"Error reading Excel file: {str(e)}")
 
 show_data_error = False
 if not st.session_state.forecast_data or not st.session_state.downtime_data:
