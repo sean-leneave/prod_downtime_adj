@@ -244,33 +244,38 @@ def process_batch_data(batch_data, downtime_data):
         if batch_df is not None and not batch_df.empty:
             # Create a mapping of original columns to standard names
             standard_columns = {
-                'well_name': ['well_name', 'well name', 'wellname', 'well', 'name', 'entity'],
-                'date': ['date'],
-                'oil_rate': ['oil_rate', 'oil rate', 'oilrate', 'oil'],
-                'gas_rate': ['gas_rate', 'gas rate', 'gasrate', 'gas'],
-                'water_rate': ['water_rate', 'water rate', 'waterrate', 'wtrrate', 'water', 'wtr']
+                'well_name': ['well_name', 'well name', 'wellname', 'well', 'name', 'entity', 'Well Name'],
+                'date': ['date', 'Date'],
+                'oil_rate': ['oil_rate', 'oil rate', 'oilrate', 'oil', 'Oil Rate'],
+                'gas_rate': ['gas_rate', 'gas rate', 'gasrate', 'gas', 'Gas Rate'],
+                'water_rate': ['water_rate', 'water rate', 'waterrate', 'wtrrate', 'water', 'wtr', 'Water Rate']
             }
+            
+            # Preserve original column names for reporting
+            orig_columns = list(batch_df.columns)
+            
+            # Create a normalized version of columns for matching (strip, lowercase)
+            normalized_columns = [str(col).strip().lower() for col in batch_df.columns]
             
             # Map columns to standard names
             col_map = {}
             for std_col, patterns in standard_columns.items():
-                for col in batch_df.columns:
-                    # Check for exact match first
-                    col_lower = str(col).strip().lower()
+                for i, col_lower in enumerate(normalized_columns):
+                    orig_col = orig_columns[i]
                     
                     # First, check for exact match with any pattern
-                    if col_lower in patterns:
-                        col_map[col] = std_col
+                    if col_lower in [p.lower() for p in patterns]:
+                        col_map[orig_col] = std_col
                         break
                     
                     # Then check for partial matches
                     for pattern in patterns:
-                        if pattern in col_lower:
-                            col_map[col] = std_col
+                        if pattern.lower() in col_lower:
+                            col_map[orig_col] = std_col
                             break
                     
                     # Break out of the loop if we've mapped this column
-                    if col in col_map:
+                    if orig_col in col_map:
                         break
             
             # Report mapping for debugging
@@ -285,9 +290,15 @@ def process_batch_data(batch_data, downtime_data):
         missing_cols = [col for col in required_cols if col not in batch_df.columns]
         
         if missing_cols:
-            st.error(f"Batch forecast file is missing required columns: {', '.join(missing_cols)}. Please check your file.")
-            st.info(f"Available columns: {', '.join(batch_df.columns)}")
-            return None, None, None
+            # Try again with 'Well Name' instead of 'well_name' if that's what's missing
+            if 'well_name' in missing_cols and 'Well Name' in batch_df.columns:
+                batch_df['well_name'] = batch_df['Well Name']
+                missing_cols.remove('well_name')
+            
+            if missing_cols:
+                st.error(f"Batch forecast file is missing required columns: {', '.join(missing_cols)}. Please check your file.")
+                st.info(f"Available columns: {', '.join(batch_df.columns)}")
+                return None, None, None
 
         if batch_df is None or batch_df.empty:
             st.error("Batch forecast file is empty. Please check your file.")
@@ -306,29 +317,42 @@ def process_batch_data(batch_data, downtime_data):
         if downtime_df is not None and not downtime_df.empty:
             # Create a mapping of original columns to standard names for downtime
             downtime_columns = {
-                'Scenario': ['scenario', 'scenario_name', 'case', 'name', 'downtime_scenario'],
-                'date': ['date'],
+                'Scenario': ['scenario', 'scenario_name', 'case', 'name', 'downtime_scenario', 'Scenario'],
+                'date': ['date', 'Date'],
                 'downtime_pct': ['downtime_pct', 'downtime', 'dt_pct', 'dt', 'pct', 'percent', 'downtime_percent']
             }
+            
+            # Preserve original column names for reporting
+            orig_dt_columns = list(downtime_df.columns)
+            
+            # Create a normalized version of columns for matching
+            normalized_dt_columns = [str(col).strip().lower() for col in downtime_df.columns]
             
             # Map downtime columns to standard names
             dt_col_map = {}
             for std_col, patterns in downtime_columns.items():
-                for col in downtime_df.columns:
-                    col_lower = str(col).strip().lower()
-                    if col_lower in patterns:
-                        dt_col_map[col] = std_col
+                for i, col_lower in enumerate(normalized_dt_columns):
+                    orig_col = orig_dt_columns[i]
+                    
+                    # First check for exact matches
+                    if col_lower in [p.lower() for p in patterns]:
+                        dt_col_map[orig_col] = std_col
                         break
+                        
+                    # Then check for partial matches
                     for pattern in patterns:
-                        if pattern in col_lower:
-                            dt_col_map[col] = std_col
+                        if pattern.lower() in col_lower:
+                            dt_col_map[orig_col] = std_col
                             break
-                    if col in dt_col_map:
+                            
+                    # Break if we mapped this column
+                    if orig_col in dt_col_map:
                         break
             
             # Apply downtime column mapping
             if dt_col_map:
-                st.info(f"Downtime column mapping: {', '.join([f'{orig} → {new}' for orig, new in dt_col_map.items()])}")
+                mapping_info = ", ".join([f"{orig} → {new}" for orig, new in dt_col_map.items()])
+                st.info(f"Downtime column mapping: {mapping_info}")
                 downtime_df = downtime_df.rename(columns=dt_col_map)
 
         # Check for required columns in downtime data
@@ -1550,26 +1574,31 @@ with col1:
                 'water_rate': ['water_rate', 'water rate', 'waterrate', 'wtrrate', 'water', 'wtr']
             }
             
+            # Preserve original column names for reporting
+            orig_columns = list(df.columns)
+            
+            # Create a normalized version of columns for matching (strip, lowercase)
+            normalized_columns = [str(col).strip().lower() for col in df.columns]
+            
             # Map columns to standard names
             col_map = {}
             for std_col, patterns in standard_columns.items():
-                for col in df.columns:
-                    # Check for exact match first
-                    col_lower = str(col).strip().lower()
+                for i, col_lower in enumerate(normalized_columns):
+                    orig_col = orig_columns[i]
                     
                     # First, check for exact match with any pattern
                     if col_lower in patterns:
-                        col_map[col] = std_col
+                        col_map[orig_col] = std_col
                         break
                     
                     # Then check for partial matches
                     for pattern in patterns:
                         if pattern in col_lower:
-                            col_map[col] = std_col
+                            col_map[orig_col] = std_col
                             break
                     
                     # Break out of the loop if we've mapped this column
-                    if col in col_map:
+                    if orig_col in col_map:
                         break
             
             # Report mapping for debugging
