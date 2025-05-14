@@ -82,25 +82,98 @@ def process_and_store_data():
 
     try:
         # Load dataframes
-        forecast_df = pd.read_csv(io.StringIO(st.session_state.forecast_data), sep='\t')
-        downtime_df = pd.read_csv(io.StringIO(st.session_state.downtime_data), sep='\t')
-        # Ensure columns match expectations
+        try:
+            forecast_df = pd.read_csv(io.StringIO(st.session_state.forecast_data), sep='\t')
+            if len(forecast_df.columns) == 1:
+                # Try comma separator if tab didn't work
+                forecast_df = pd.read_csv(io.StringIO(st.session_state.forecast_data), sep=',')
+                st.info("Detected comma-separated values for forecast data.")
+        except Exception as e:
+            st.error(f"Error parsing forecast data: {str(e)}")
+            return False
+            
+        try:
+            downtime_df = pd.read_csv(io.StringIO(st.session_state.downtime_data), sep='\t')
+            if len(downtime_df.columns) == 1:
+                # Try comma separator if tab didn't work
+                downtime_df = pd.read_csv(io.StringIO(st.session_state.downtime_data), sep=',')
+                st.info("Detected comma-separated values for downtime data.")
+        except Exception as e:
+            st.error(f"Error parsing downtime data: {str(e)}")
+            return False
+            
+        # Print loaded columns for debugging
+        st.info(f"Loaded forecast columns: {', '.join(forecast_df.columns)}")
+        
+        # Handle column mapping for forecast data
+        standard_columns = {
+            'Well Name': ['well_name', 'well name', 'wellname', 'well', 'name', 'entity', 'Well Name'],
+            'date': ['date', 'Date'],
+            'oil_rate': ['oil_rate', 'oil rate', 'oilrate', 'oil', 'Oil Rate'],
+            'gas_rate': ['gas_rate', 'gas rate', 'gasrate', 'gas', 'Gas Rate'],
+            'water_rate': ['water_rate', 'water rate', 'waterrate', 'wtrrate', 'water', 'wtr', 'Water Rate']
+        }
+        
+        orig_columns = list(forecast_df.columns)
+        normalized_columns = [str(col).strip().lower() for col in forecast_df.columns]
+        
+        # Map columns to standard names
+        col_map = {}
+        for std_col, patterns in standard_columns.items():
+            for i, col_lower in enumerate(normalized_columns):
+                orig_col = orig_columns[i]
+                
+                # First, check for exact match with any pattern
+                if col_lower in [p.lower() for p in patterns]:
+                    col_map[orig_col] = std_col
+                    break
+                
+                # Then check for partial matches (skip if already mapped)
+                if orig_col not in col_map:
+                    for pattern in patterns:
+                        if pattern.lower() in col_lower:
+                            col_map[orig_col] = std_col
+                            break
+                
+                # Break out of the loop if we've mapped this column
+                if orig_col in col_map:
+                    break
+        
+        # Report mapping for debugging
+        if col_map:
+            mapping_info = ", ".join([f"{orig} → {new}" for orig, new in col_map.items()])
+            st.info(f"Column mapping: {mapping_info}")
+            
+        # Apply column mapping
+        forecast_df = forecast_df.rename(columns=col_map)
+        
+        # Check for required columns
         forecast_columns = ['Well Name', 'date', 'oil_rate', 'gas_rate', 'water_rate']
+        missing_cols = [col for col in forecast_columns if col not in forecast_df.columns]
+        
+        # Try alternate mapping if columns are still missing
+        if 'Well Name' in missing_cols and 'well_name' in forecast_df.columns:
+            forecast_df['Well Name'] = forecast_df['well_name']
+            missing_cols.remove('Well Name')
+            
+        if missing_cols:
+            st.error(f"Forecast file is missing required columns: {', '.join(missing_cols)}. Please check your file.")
+            st.info(f"Available columns: {', '.join(forecast_df.columns)}")
+            return False
+            
+        # Handle similar mapping for downtime data if needed
         downtime_columns = ['Scenario', 'date', 'downtime_pct']
-        for req in forecast_columns:
-            if req not in forecast_df.columns:
-                forecast_df[req] = '' if req == 'Well Name' or req == 'date' else None
-        forecast_df = forecast_df[forecast_columns]
-        forecast_df['Well Name'] = forecast_df['Well Name'].astype(str)
         for req in downtime_columns:
             if req not in downtime_df.columns:
                 downtime_df[req] = '' if req == 'Scenario' or req == 'date' else None
         downtime_df = downtime_df[downtime_columns]
         downtime_df['Scenario'] = downtime_df['Scenario'].astype(str)
+        
         # Check if DataFrames are empty
         if forecast_df.empty or downtime_df.empty:
             st.error("Forecast or downtime data is empty or invalid.")
             return False
+            
         # Process each unique well independently
         st.session_state.processed_wells = {}
         for well in forecast_df['Well Name'].unique():
@@ -181,6 +254,65 @@ def process_input_data(forecast_data, downtime_data):
                 st.info("Detected comma-separated values for downtime data instead of tabs. Processing anyway.")
         except Exception as e:
             st.error(f"Error parsing downtime data: {str(e)}\nPlease ensure data is tab-separated with proper headers.")
+            return None, None
+
+        # Print loaded columns for debugging
+        st.info(f"Loaded columns: {', '.join(forecast_df.columns)}")
+        
+        # Handle column mapping for forecast data
+        standard_columns = {
+            'Well Name': ['well_name', 'well name', 'wellname', 'well', 'name', 'entity', 'Well Name'],
+            'date': ['date', 'Date'],
+            'oil_rate': ['oil_rate', 'oil rate', 'oilrate', 'oil', 'Oil Rate'],
+            'gas_rate': ['gas_rate', 'gas rate', 'gasrate', 'gas', 'Gas Rate'],
+            'water_rate': ['water_rate', 'water rate', 'waterrate', 'wtrrate', 'water', 'wtr', 'Water Rate']
+        }
+        
+        orig_columns = list(forecast_df.columns)
+        normalized_columns = [str(col).strip().lower() for col in forecast_df.columns]
+        
+        # Map columns to standard names
+        col_map = {}
+        for std_col, patterns in standard_columns.items():
+            for i, col_lower in enumerate(normalized_columns):
+                orig_col = orig_columns[i]
+                
+                # First, check for exact match with any pattern
+                if col_lower in [p.lower() for p in patterns]:
+                    col_map[orig_col] = std_col
+                    break
+                
+                # Then check for partial matches (skip if already mapped)
+                if orig_col not in col_map:
+                    for pattern in patterns:
+                        if pattern.lower() in col_lower:
+                            col_map[orig_col] = std_col
+                            break
+                
+                # Break out of the loop if we've mapped this column
+                if orig_col in col_map:
+                    break
+        
+        # Report mapping for debugging
+        if col_map:
+            mapping_info = ", ".join([f"{orig} → {new}" for orig, new in col_map.items()])
+            st.info(f"Column mapping: {mapping_info}")
+            
+        # Apply column mapping
+        forecast_df = forecast_df.rename(columns=col_map)
+        
+        # Check for required columns
+        required_cols = ['Well Name', 'date', 'oil_rate', 'gas_rate', 'water_rate']
+        missing_cols = [col for col in required_cols if col not in forecast_df.columns]
+        
+        # Try alternate mapping if columns are still missing
+        if 'Well Name' in missing_cols and 'well_name' in forecast_df.columns:
+            forecast_df['Well Name'] = forecast_df['well_name']
+            missing_cols.remove('Well Name')
+            
+        if missing_cols:
+            st.error(f"Forecast file is missing required columns: {', '.join(missing_cols)}. Please check your file.")
+            st.info(f"Available columns: {', '.join(forecast_df.columns)}")
             return None, None
 
         # Check for required columns
