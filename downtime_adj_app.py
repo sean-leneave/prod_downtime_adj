@@ -69,6 +69,10 @@ if 'mosaic_zip_buffer' not in st.session_state:
     st.session_state.mosaic_zip_buffer = None
 if 'mosaic_zip_filename' not in st.session_state:
     st.session_state.mosaic_zip_filename = None
+if 'generated_export_bytes' not in st.session_state:
+    st.session_state.generated_export_bytes = None
+if 'generated_export_filename' not in st.session_state:
+    st.session_state.generated_export_filename = None
 
 def process_and_store_data():
     """Process input data and store results in session state"""
@@ -118,6 +122,12 @@ def process_and_store_data():
             df = f_df.join(d_df, how='left')
             df = df.sort_index()
             df_out, df_interpolate = process_production_data(df)
+            
+            # Add defensive check for empty result DataFrames
+            if df_out is None or df_out.empty or len(df_out.index) == 0:
+                # Skip this well and move to the next one
+                continue
+                
             st.session_state.processed_wells[well] = {
                 'data': df_out,
                 'figure': create_plotly_figure(df_out, well_name=well)
@@ -1335,7 +1345,7 @@ if st.session_state.show_docs:
         # Close button for documentation
         if st.button("Close Documentation"):
             st.session_state.show_docs = False
-            st.experimental_rerun()
+            st.rerun()
 
 # Main application
 st.title("Forecast-Downtime Processing Tool")
@@ -1794,7 +1804,7 @@ if st.session_state.processed_data is not None and 'processed_wells' in st.sessi
             excel_bytes, excel_filename = generate_selected_wells_excel()
             st.session_state.generated_export_bytes = excel_bytes
             st.session_state.generated_export_filename = excel_filename
-            st.experimental_rerun()
+            st.rerun()
     with export_col2:
         if (
             hasattr(st.session_state, 'generated_export_bytes') and
@@ -1840,9 +1850,14 @@ if st.session_state.processed_data is not None and 'processed_wells' in st.sessi
             zip_filename = f"Mosaic_Templates_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.zip"
             st.session_state.mosaic_zip_buffer = zip_buffer.getvalue()
             st.session_state.mosaic_zip_filename = zip_filename
-            st.experimental_rerun()
+            st.rerun()
     with mosaic_col2:
-        if st.session_state.mosaic_zip_buffer is not None:
+        if (
+            hasattr(st.session_state, 'mosaic_zip_buffer') and 
+            st.session_state.mosaic_zip_buffer is not None and
+            hasattr(st.session_state, 'mosaic_zip_filename') and
+            st.session_state.mosaic_zip_filename is not None
+        ):
             st.download_button(
                 label="Download Mosaic Templates (ZIP)",
                 data=st.session_state.mosaic_zip_buffer,
