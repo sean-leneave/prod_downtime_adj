@@ -1797,27 +1797,21 @@ if st.session_state.processed_data is not None and 'processed_wells' in st.sessi
     st.markdown("**Export Options**")
     all_wells = list(st.session_state.processed_wells.keys())
     selected_export_wells = st.multiselect("Select wells to export (rates/volumes)", all_wells, default=all_wells, key="export_wells")
-    export_col1, export_col2 = st.columns([1,1])
+    
+    # Generate and download in one go without using rerun
+    export_col1, _ = st.columns([1,1])
     with export_col1:
-        generate_export_clicked = st.button("Generate Export", key="generate_export", help="Generate Excel export for selected wells", type="secondary")
-        if generate_export_clicked:
+        # Generate the Excel file when button is clicked
+        if st.button("Generate and Download Excel", key="generate_export", help="Generate and download Excel file with selected wells", type="primary"):
             excel_bytes, excel_filename = generate_selected_wells_excel()
-            st.session_state.generated_export_bytes = excel_bytes
-            st.session_state.generated_export_filename = excel_filename
-            st.experimental_rerun()
-    with export_col2:
-        if (
-            hasattr(st.session_state, 'generated_export_bytes') and
-            st.session_state.generated_export_bytes is not None and
-            hasattr(st.session_state, 'generated_export_filename') and
-            st.session_state.generated_export_filename is not None
-        ):
+            
+            # Create a download button for the generated file
             st.download_button(
-                label="Download Exported Excel",
-                data=st.session_state.generated_export_bytes,
-                file_name=st.session_state.generated_export_filename,
+                label="Click to Download Excel",
+                data=excel_bytes,
+                file_name=excel_filename,
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                type="primary"
+                key="download_excel"
             )
 
     # --- Mosaic Export Section ---
@@ -1826,10 +1820,12 @@ if st.session_state.processed_data is not None and 'processed_wells' in st.sessi
     selected_mosaic_wells = st.multiselect("Select wells for Mosaic export", all_wells, default=all_wells, key="mosaic_export_wells")
     reserves_cycle = st.text_input("Reserves Cycle Label (i.e., MY25, YE25)", placeholder="Enter reserves cycle label...(optional)", key="mosaic_reserves_cycle")
     reserve_category = st.selectbox("Reserve Category", ["PDP", "2PDP", "3PDP"], key="mosaic_reserve_cat")
-    mosaic_col1, mosaic_col2 = st.columns([1,1])
+    
+    # Generate and download in one go without using rerun
+    mosaic_col1, _ = st.columns([1,1])
     with mosaic_col1:
-        generate_clicked = st.button("Generate Mosaic Templates (ZIP)", key="export_selected_mosaic", type="secondary")
-        if generate_clicked:
+        # Generate the Mosaic templates when button is clicked
+        if st.button("Generate and Download Mosaic Templates", key="export_selected_mosaic", help="Generate and download Mosaic templates for selected wells", type="primary"):
             import io, zipfile
             zip_buffer = io.BytesIO()
             with zipfile.ZipFile(zip_buffer, 'w') as zf:
@@ -1846,23 +1842,16 @@ if st.session_state.processed_data is not None and 'processed_wells' in st.sessi
                     today_str = pd.Timestamp.now().strftime('%Y%m%d')
                     filename = f"{reserve_category}_{well}_Mosaic_Template_{today_str}.xlsx"
                     zf.writestr(filename, excel_buffer.getvalue())
+            
+            # Create the download button for the generated ZIP
             zip_buffer.seek(0)
             zip_filename = f"Mosaic_Templates_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.zip"
-            st.session_state.mosaic_zip_buffer = zip_buffer.getvalue()
-            st.session_state.mosaic_zip_filename = zip_filename
-            st.experimental_rerun()
-    with mosaic_col2:
-        if (
-            hasattr(st.session_state, 'mosaic_zip_buffer') and 
-            st.session_state.mosaic_zip_buffer is not None and
-            hasattr(st.session_state, 'mosaic_zip_filename') and
-            st.session_state.mosaic_zip_filename is not None
-        ):
+            
             st.download_button(
-                label="Download Mosaic Templates (ZIP)",
-                data=st.session_state.mosaic_zip_buffer,
-                file_name=st.session_state.mosaic_zip_filename,
+                label="Click to Download Mosaic Templates",
+                data=zip_buffer.getvalue(),
+                file_name=zip_filename,
                 mime="application/zip",
-                type="primary"
+                key="download_mosaic"
             )
 
