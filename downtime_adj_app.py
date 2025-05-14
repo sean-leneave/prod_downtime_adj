@@ -233,37 +233,57 @@ def process_batch_data(batch_data, downtime_data):
             batch_df = pd.read_csv(io.StringIO(batch_data), sep='\t')
             if len(batch_df.columns) == 1:
                 batch_df = pd.read_csv(io.StringIO(batch_data), sep=',')
+                st.info("Detected comma-separated values for batch data.")
         except Exception as e:
             st.error(f"Error parsing batch data: {str(e)}\nPlease ensure data is tab-separated with proper headers.")
             return None, None, None
 
+        # Print debug info about loaded columns
+        st.info(f"Loaded batch data columns: {', '.join(batch_df.columns)}")
+        
         # Normalize column names: strip whitespace, lower-case
         if batch_df is not None and not batch_df.empty:
-            batch_df.columns = [col.strip().lower().replace(' ', '').replace('_', '').replace('-', '') for col in batch_df.columns]
-            # Map to required names
+            # Normalize column names to make matching more robust
+            batch_df.columns = [str(col).strip().lower() for col in batch_df.columns]
+            
+            # Map to required names - be more flexible with pattern matching
             col_map = {}
             for col in batch_df.columns:
-                if 'wellname' in col:
+                if any(pattern in col for pattern in ['well', 'name', 'wellname', 'entity']):
                     col_map[col] = 'well_name'
-                elif col == 'date':
+                elif col == 'date' or 'date' in col:
                     col_map[col] = 'date'
-                elif 'oilrate' in col:
+                elif any(pattern in col for pattern in ['oil', 'oilrate']):
                     col_map[col] = 'oil_rate'
-                elif 'gasrate' in col:
+                elif any(pattern in col for pattern in ['gas', 'gasrate']):
                     col_map[col] = 'gas_rate'
-                elif 'waterrate' in col or 'wtrrate' in col:
+                elif any(pattern in col for pattern in ['water', 'waterrate', 'wtr', 'wtrrate']):
                     col_map[col] = 'water_rate'
+            
+            # Report mapping for debugging
+            if col_map:
+                mapping_info = ", ".join([f"{orig} → {new}" for orig, new in col_map.items()])
+                st.info(f"Column mapping: {mapping_info}")
+                
             batch_df = batch_df.rename(columns=col_map)
             
         required_cols = ['well_name', 'date', 'oil_rate', 'gas_rate', 'water_rate']
-        if batch_df is None or batch_df.empty or not all(col in batch_df.columns for col in required_cols):
-            st.error("Batch forecast file is empty or missing required columns: well_name, date, oil_rate, gas_rate, water_rate. Please check your file.")
+        missing_cols = [col for col in required_cols if col not in batch_df.columns]
+        
+        if missing_cols:
+            st.error(f"Batch forecast file is missing required columns: {', '.join(missing_cols)}. Please check your file.")
+            st.info(f"Available columns: {', '.join(batch_df.columns)}")
+            return None, None, None
+
+        if batch_df is None or batch_df.empty:
+            st.error("Batch forecast file is empty. Please check your file.")
             return None, None, None
 
         try:
             downtime_df = pd.read_csv(io.StringIO(downtime_data), sep='\t')
             if len(downtime_df.columns) == 1:
                 downtime_df = pd.read_csv(io.StringIO(downtime_data), sep=',')
+                st.info("Detected comma-separated values for downtime data.")
         except Exception as e:
             st.error(f"Error parsing downtime data: {str(e)}\nPlease ensure data is tab-separated with proper headers.")
             return None, None, None
@@ -312,6 +332,8 @@ def process_batch_data(batch_data, downtime_data):
 
     except Exception as e:
         st.error(f"Error processing batch data: {str(e)}")
+        import traceback
+        st.error(f"Traceback: {traceback.format_exc()}")
         return None, None, None
 
 def validate_input_data(forecast_df, downtime_df):
@@ -1461,32 +1483,58 @@ with col1:
                 df = pd.read_csv(uploaded_file, sep='\t')
                 if len(df.columns) == 1:
                     df = pd.read_csv(uploaded_file, sep=',')
-            except Exception:
-                df = pd.read_csv(uploaded_file, sep=',')
+                    st.info("Detected comma-separated values for forecast data instead of tabs. Processing anyway.")
+            except Exception as e:
+                st.error(f"Error parsing CSV file: {str(e)}")
+                try:
+                    df = pd.read_csv(uploaded_file, sep=',')
+                    st.info("Trying with comma separator instead.")
+                except Exception as e2:
+                    st.error(f"Also failed with comma separator: {str(e2)}")
         elif uploaded_file.name.endswith(('.xlsx', '.xls')):
             df = pd.read_excel(uploaded_file)
+        
         if df is not None and not df.empty:
-            df.columns = [col.strip().lower().replace(' ', '').replace('_', '').replace('-', '') for col in df.columns]
+            # Print debug info about loaded columns
+            st.info(f"Loaded columns: {', '.join(df.columns)}")
+            
+            # Normalize column names to make matching more robust
+            df.columns = [str(col).strip().lower() for col in df.columns]
+            
+            # Map to required names - be more flexible with pattern matching
             col_map = {}
             for col in df.columns:
-                if 'wellname' in col:
+                if any(pattern in col for pattern in ['well', 'name', 'wellname', 'entity']):
                     col_map[col] = 'Well Name'
-                elif col == 'date':
+                elif col == 'date' or 'date' in col:
                     col_map[col] = 'date'
-                elif 'oilrate' in col:
+                elif any(pattern in col for pattern in ['oil', 'oilrate']):
                     col_map[col] = 'oil_rate'
-                elif 'gasrate' in col:
+                elif any(pattern in col for pattern in ['gas', 'gasrate']):
                     col_map[col] = 'gas_rate'
-                elif 'waterrate' in col or 'wtrrate' in col:
+                elif any(pattern in col for pattern in ['water', 'waterrate', 'wtr', 'wtrrate']):
                     col_map[col] = 'water_rate'
+            
+            # Report mapping for debugging
+            if col_map:
+                mapping_info = ", ".join([f"{orig} → {new}" for orig, new in col_map.items()])
+                st.info(f"Column mapping: {mapping_info}")
+                
             df = df.rename(columns=col_map)
+            
             if 'Well Name' not in df.columns and well_name:
                 df.insert(0, 'Well Name', well_name)
             elif 'Well Name' in df.columns and well_name and (df['Well Name'].isnull().all() or (df['Well Name'] == '').all()):
                 df['Well Name'] = well_name
+                
         required_cols = ['Well Name', 'date', 'oil_rate', 'gas_rate', 'water_rate']
-        if df is None or df.empty or not all(col in df.columns for col in required_cols):
-            st.error("Forecast file is empty or missing required columns: Well Name, date, oil_rate, gas_rate, water_rate. Please check your file.")
+        missing_cols = [col for col in required_cols if col not in df.columns]
+        
+        if missing_cols:
+            st.error(f"Forecast file is missing required columns: {', '.join(missing_cols)}. Please check your file.")
+            st.info(f"Available columns: {', '.join(df.columns)}")
+        elif df is None or df.empty:
+            st.error("Forecast file is empty. Please check your file.")
         else:
             st.session_state.forecast_data = df.to_csv(sep='\t', index=False)
             # Refresh the table and show success message
@@ -1584,27 +1632,51 @@ with col2:
                 df = pd.read_csv(uploaded_downtime, sep='\t')
                 if len(df.columns) == 1:
                     df = pd.read_csv(uploaded_downtime, sep=',')
-            except Exception:
-                df = pd.read_csv(uploaded_downtime, sep=',')
+                    st.info("Detected comma-separated values for downtime data instead of tabs. Processing anyway.")
+            except Exception as e:
+                st.error(f"Error parsing CSV file: {str(e)}")
+                try:
+                    df = pd.read_csv(uploaded_downtime, sep=',')
+                    st.info("Trying with comma separator instead.")
+                except Exception as e2:
+                    st.error(f"Also failed with comma separator: {str(e2)}")
         elif uploaded_downtime.name.endswith(('.xlsx', '.xls')):
             df = pd.read_excel(uploaded_downtime)
+            
         if df is not None and not df.empty:
-            df.columns = [col.strip().lower().replace(' ', '').replace('_', '').replace('-', '') for col in df.columns]
+            # Print debug info about loaded columns
+            st.info(f"Loaded downtime columns: {', '.join(df.columns)}")
+            
+            # Normalize column names to make matching more robust
+            df.columns = [str(col).strip().lower() for col in df.columns]
+            
+            # Map to required names - be more flexible with pattern matching
             col_map = {}
             for col in df.columns:
-                if 'scenario' in col:
+                if any(pattern in col for pattern in ['scenario', 'case', 'name']):
                     col_map[col] = 'Scenario'
-                elif col == 'date':
+                elif col == 'date' or 'date' in col:
                     col_map[col] = 'date'
-                elif 'downtime' in col and 'pct' in col:
+                elif any(pattern in col for pattern in ['downtime', 'dt', 'pct', 'percent']):
                     col_map[col] = 'downtime_pct'
+            
+            # Report mapping for debugging
+            if col_map:
+                mapping_info = ", ".join([f"{orig} → {new}" for orig, new in col_map.items()])
+                st.info(f"Downtime column mapping: {mapping_info}")
+                
             df = df.rename(columns=col_map)
+            
         required_cols = ['Scenario', 'date', 'downtime_pct']
-        if df is None or df.empty or not all(col in df.columns for col in required_cols):
-            st.error("Downtime file is empty or missing required columns: Scenario, date, downtime_pct. Please check your file.")
+        missing_cols = [col for col in required_cols if col not in df.columns]
+        
+        if missing_cols:
+            st.error(f"Downtime file is missing required columns: {', '.join(missing_cols)}. Please check your file.")
+            st.info(f"Available columns: {', '.join(df.columns)}")
+        elif df is None or df.empty:
+            st.error("Downtime file is empty. Please check your file.")
         else:
             st.session_state.downtime_data = df.to_csv(sep='\t', index=False)
-
             # Refresh the table and show success message
             st.success("Successfully loaded downtime.")
             downtime_df = df[required_cols]
