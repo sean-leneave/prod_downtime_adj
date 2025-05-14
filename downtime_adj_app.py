@@ -1699,11 +1699,11 @@ with col1:
             
             # Create a mapping of original columns to standard names
             standard_columns = {
-                'Well Name': ['well_name', 'well name', 'wellname', 'well', 'name', 'entity'],
-                'date': ['date'],
-                'oil_rate': ['oil_rate', 'oil rate', 'oilrate', 'oil'],
-                'gas_rate': ['gas_rate', 'gas rate', 'gasrate', 'gas'],
-                'water_rate': ['water_rate', 'water rate', 'waterrate', 'wtrrate', 'water', 'wtr']
+                'Well Name': ['well_name', 'well name', 'wellname', 'well', 'name', 'entity', 'Well Name'],
+                'date': ['date', 'Date'],
+                'oil_rate': ['oil_rate', 'oil rate', 'oilrate', 'oil', 'Oil Rate'],
+                'gas_rate': ['gas_rate', 'gas rate', 'gasrate', 'gas', 'Gas Rate'],
+                'water_rate': ['water_rate', 'water rate', 'waterrate', 'wtrrate', 'water', 'wtr', 'Water Rate']
             }
             
             # Preserve original column names for reporting
@@ -1719,15 +1719,16 @@ with col1:
                     orig_col = orig_columns[i]
                     
                     # First, check for exact match with any pattern
-                    if col_lower in patterns:
+                    if col_lower in [p.lower() for p in patterns]:
                         col_map[orig_col] = std_col
                         break
                     
-                    # Then check for partial matches
-                    for pattern in patterns:
-                        if pattern in col_lower:
-                            col_map[orig_col] = std_col
-                            break
+                    # Then check for partial matches (skip if already mapped)
+                    if orig_col not in col_map:
+                        for pattern in patterns:
+                            if pattern.lower() in col_lower:
+                                col_map[orig_col] = std_col
+                                break
                     
                     # Break out of the loop if we've mapped this column
                     if orig_col in col_map:
@@ -1742,7 +1743,10 @@ with col1:
             df = df.rename(columns=col_map)
             
             # Add Well Name if missing and well_name is provided
-            if 'Well Name' not in df.columns and well_name:
+            if 'Well Name' not in df.columns and 'well_name' in df.columns:
+                df['Well Name'] = df['well_name']
+                st.info("Mapped 'well_name' to 'Well Name'")
+            elif 'Well Name' not in df.columns and well_name:
                 df.insert(0, 'Well Name', well_name)
             elif 'Well Name' in df.columns and well_name and (df['Well Name'].isnull().all() or (df['Well Name'] == '').all()):
                 df['Well Name'] = well_name
@@ -1869,31 +1873,37 @@ with col2:
             
             # Create a mapping of original columns to standard names
             standard_columns = {
-                'Scenario': ['scenario', 'scenario_name', 'case', 'name', 'downtime_scenario'],
-                'date': ['date'],
+                'Scenario': ['scenario', 'scenario_name', 'case', 'name', 'downtime_scenario', 'Scenario'],
+                'date': ['date', 'Date'],
                 'downtime_pct': ['downtime_pct', 'downtime', 'dt_pct', 'dt', 'pct', 'percent', 'downtime_percent']
             }
+            
+            # Preserve original column names for reporting
+            orig_columns = list(df.columns)
+            
+            # Create a normalized version of columns for matching (strip, lowercase)
+            normalized_columns = [str(col).strip().lower() for col in df.columns]
             
             # Map columns to standard names
             col_map = {}
             for std_col, patterns in standard_columns.items():
-                for col in df.columns:
-                    # Check for exact match first
-                    col_lower = str(col).strip().lower()
+                for i, col_lower in enumerate(normalized_columns):
+                    orig_col = orig_columns[i]
                     
                     # First, check for exact match with any pattern
-                    if col_lower in patterns:
-                        col_map[col] = std_col
+                    if col_lower in [p.lower() for p in patterns]:
+                        col_map[orig_col] = std_col
                         break
                     
-                    # Then check for partial matches
-                    for pattern in patterns:
-                        if pattern in col_lower:
-                            col_map[col] = std_col
-                            break
+                    # Then check for partial matches (skip if already mapped)
+                    if orig_col not in col_map:
+                        for pattern in patterns:
+                            if pattern.lower() in col_lower:
+                                col_map[orig_col] = std_col
+                                break
                     
                     # Break out of the loop if we've mapped this column
-                    if col in col_map:
+                    if orig_col in col_map:
                         break
             
             # Report mapping for debugging
@@ -1904,6 +1914,10 @@ with col2:
             # Apply column mapping
             df = df.rename(columns=col_map)
             
+            # Add Scenario if missing
+            if 'Scenario' not in df.columns and scenario_name:
+                df.insert(0, 'Scenario', scenario_name)
+                
         required_cols = ['Scenario', 'date', 'downtime_pct']
         missing_cols = [col for col in required_cols if col not in df.columns]
         
