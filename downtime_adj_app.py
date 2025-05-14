@@ -1211,20 +1211,20 @@ with st.sidebar:
     """)
     # Add template download buttons
     st.markdown('<div class="sidebar-center">', unsafe_allow_html=True)
-    with open("template_production_forecast.csv", "rb") as f:
+    with open("template_production_forecast.xlsx", "rb") as f:
         st.download_button(
             label="Production Forecast Template",
             data=f.read(),
-            file_name="template_production_forecast.csv",
-            mime="text/csv",
+            file_name="template_production_forecast.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             key="sidebar_prod_template_btn"
         )
-    with open("template_downtime_forecast.csv", "rb") as f:
+    with open("template_downtime_forecast.xlsx", "rb") as f:
         st.download_button(
             label="Downtime Forecast Template",
             data=f.read(),
-            file_name="template_downtime_forecast.csv",
-            mime="text/csv",
+            file_name="template_downtime_forecast.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             key="sidebar_dt_template_btn"
         )
     if st.button("📚 View Documentation", use_container_width=True, key="sidebar_doc_btn"):
