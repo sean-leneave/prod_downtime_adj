@@ -1455,7 +1455,7 @@ st.markdown("""
         margin-top: 0 !important;
     }
     .well-dropdown {
-        min-width: 300px !important;
+        min-width: 150px !important;
         width: 100% !important;
     }
     </style>
@@ -2084,13 +2084,13 @@ if st.session_state.processed_data is not None and 'processed_wells' in st.sessi
     # Well selection dropdown (always show if processed_wells exists)
     well_options = list(st.session_state.processed_wells.keys())
     if well_options:
-        dropdown_col, _ = st.columns([3, 4])  # Change from [1, 6] to [3, 4] to make dropdown wider
+        dropdown_col, _ = st.columns([1.5, 5.5])  # 1.5:5.5 ratio (50% wider than original 1:6)
         with dropdown_col:
             # Apply CSS to the well dropdown
             st.markdown('''
                 <style>  
                 [data-testid="stSelectbox"] > div:first-child > div:first-child {
-                    min-width: 300px;
+                    min-width: 150px;
                 }
                 </style>
                 ''', unsafe_allow_html=True)
