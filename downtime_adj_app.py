@@ -1454,6 +1454,10 @@ st.markdown("""
     .stFileUploader {
         margin-top: 0 !important;
     }
+    .well-dropdown {
+        min-width: 300px !important;
+        width: 100% !important;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -1464,12 +1468,12 @@ with st.sidebar:
     1. Paste monthly forecast into tables or upload file
     2. Click 'Process Data' to run calculations
     3. Compare input and adjusted forecasts
-    4. Export data as Excel file
-    5. Generate Mosaic templates 
+    4. Export data as Excel file (optional)
+    5. Generate Mosaic templates (optional)
     """)
     st.header("Data Format")
     st.markdown("""
-        - Well Name
+        - Well Name (Entity Name if plan to use Mosaic templates)
         - Date, monthly
         - Oil Rate (bopd) 
         - Gas Rate (mcfd)
@@ -2080,9 +2084,22 @@ if st.session_state.processed_data is not None and 'processed_wells' in st.sessi
     # Well selection dropdown (always show if processed_wells exists)
     well_options = list(st.session_state.processed_wells.keys())
     if well_options:
-        dropdown_col, _ = st.columns([1, 6])  # 1:6 ratio for narrow dropdown
+        dropdown_col, _ = st.columns([3, 4])  # Change from [1, 6] to [3, 4] to make dropdown wider
         with dropdown_col:
-            selected_well = st.selectbox("Select Well to View", well_options, index=well_options.index(st.session_state.selected_well) if st.session_state.selected_well in well_options else 0)
+            # Apply CSS to the well dropdown
+            st.markdown('''
+                <style>  
+                [data-testid="stSelectbox"] > div:first-child > div:first-child {
+                    min-width: 300px;
+                }
+                </style>
+                ''', unsafe_allow_html=True)
+            selected_well = st.selectbox(
+                "Select Well to View", 
+                well_options, 
+                index=well_options.index(st.session_state.selected_well) if st.session_state.selected_well in well_options else 0,
+                key="well_dropdown"
+            )
         if selected_well != st.session_state.selected_well:
             st.session_state.selected_well = selected_well
             st.session_state.processed_data = st.session_state.processed_wells[selected_well]['data']
