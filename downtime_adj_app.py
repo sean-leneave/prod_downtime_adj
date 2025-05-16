@@ -15,7 +15,6 @@ from openpyxl import load_workbook
 from openpyxl.styles import Font, PatternFill
 
 # Constants
-# Add this right after the imports
 DEBUG_MODE = False  # Set to True to show debugging info messages
 
 COLORS = {
@@ -99,7 +98,6 @@ def process_and_store_data():
         try:
             downtime_df = pd.read_csv(io.StringIO(st.session_state.downtime_data), sep='\t')
             if len(downtime_df.columns) == 1:
-                # Try comma separator if tab didn't work
                 downtime_df = pd.read_csv(io.StringIO(st.session_state.downtime_data), sep=',')
                 if DEBUG_MODE:
                     st.info("Detected comma-separated values for downtime data.")
@@ -129,19 +127,19 @@ def process_and_store_data():
             for i, col_lower in enumerate(normalized_columns):
                 orig_col = orig_columns[i]
                 
-                # First, check for exact match with any pattern
+                # check for exact match with any pattern
                 if col_lower in [p.lower() for p in patterns]:
                     col_map[orig_col] = std_col
                     break
                 
-                # Then check for partial matches (skip if already mapped)
+                # check for partial matches (skip if already mapped)
                 if orig_col not in col_map:
                     for pattern in patterns:
                         if pattern.lower() in col_lower:
                             col_map[orig_col] = std_col
                             break
                 
-                # Break out of the loop if we've mapped this column
+                # Break out of the loop if mapped this column
                 if orig_col in col_map:
                     break
         
@@ -248,7 +246,6 @@ def process_input_data(forecast_data, downtime_data):
         try:
             forecast_df = pd.read_csv(io.StringIO(forecast_data), sep='\t')
             if len(forecast_df.columns) == 1:
-                # Try comma separator if tab didn't work
                 forecast_df = pd.read_csv(io.StringIO(forecast_data), sep=',')
                 if DEBUG_MODE:
                     st.info("Detected comma-separated values for forecast data instead of tabs. Processing anyway.")
@@ -259,7 +256,6 @@ def process_input_data(forecast_data, downtime_data):
         try:
             downtime_df = pd.read_csv(io.StringIO(downtime_data), sep='\t')
             if len(downtime_df.columns) == 1:
-                # Try comma separator if tab didn't work
                 downtime_df = pd.read_csv(io.StringIO(downtime_data), sep=',')
                 if DEBUG_MODE:
                     st.info("Detected comma-separated values for downtime data instead of tabs. Processing anyway.")
@@ -289,19 +285,19 @@ def process_input_data(forecast_data, downtime_data):
             for i, col_lower in enumerate(normalized_columns):
                 orig_col = orig_columns[i]
                 
-                # First, check for exact match with any pattern
+                # Check for exact match with any pattern
                 if col_lower in [p.lower() for p in patterns]:
                     col_map[orig_col] = std_col
                     break
                 
-                # Then check for partial matches (skip if already mapped)
+                # Check for partial matches (skip if already mapped)
                 if orig_col not in col_map:
                     for pattern in patterns:
                         if pattern.lower() in col_lower:
                             col_map[orig_col] = std_col
                             break
                 
-                # Break out of the loop if we've mapped this column
+                # Break out of the loop if mapped this column
                 if orig_col in col_map:
                     break
         
@@ -418,18 +414,18 @@ def process_batch_data(batch_data, downtime_data):
                 for i, col_lower in enumerate(normalized_columns):
                     orig_col = orig_columns[i]
                     
-                    # First, check for exact match with any pattern
+                    # Check for exact match with any pattern
                     if col_lower in [p.lower() for p in patterns]:
                         col_map[orig_col] = std_col
                         break
                     
-                    # Then check for partial matches
+                    # Check for partial matches
                     for pattern in patterns:
                         if pattern.lower() in col_lower:
                             col_map[orig_col] = std_col
                             break
                     
-                    # Break out of the loop if we've mapped this column
+                    # Break out of the loop if mapped this column
                     if orig_col in col_map:
                         break
             
@@ -491,18 +487,18 @@ def process_batch_data(batch_data, downtime_data):
                 for i, col_lower in enumerate(normalized_dt_columns):
                     orig_col = orig_dt_columns[i]
                     
-                    # First check for exact matches
+                    # Check for exact matches
                     if col_lower in [p.lower() for p in patterns]:
                         dt_col_map[orig_col] = std_col
                         break
                         
-                    # Then check for partial matches
+                    # Check for partial matches
                     for pattern in patterns:
                         if pattern.lower() in col_lower:
                             dt_col_map[orig_col] = std_col
                             break
                             
-                    # Break if we mapped this column
+                    # Break if mapped this column
                     if orig_col in dt_col_map:
                         break
             
@@ -804,15 +800,36 @@ def process_production_data(df):
         # Check if we're still within the input range for non-declining oil rates
         if current_date <= df.index[decline_start_index]:
             adj_oil_rate = df_out.loc[current_date, 'oil_rate'] * (1 - df_out.loc[current_date, 'downtime_pct'])
+            # Calculate gas and water rates based on input
+            if adj_oil_rate > 0:
+                adj_gas_rate = df_out.loc[current_date, 'gas_rate'] * (1 - df_out.loc[current_date, 'downtime_pct'])
+                adj_water_rate = df_out.loc[current_date, 'water_rate'] * (1 - df_out.loc[current_date, 'downtime_pct'])
+            else:
+                adj_gas_rate = 0
+                adj_water_rate = 0
+            adj_liquid_rate = adj_oil_rate + adj_water_rate
         else:
-            # Use interpolated values for oil rate and adjust for downtime
-            adj_oil_rate = interpolate_values(last_np_out, df_interpolate['Np'], df_interpolate['oil_rate'])
-            downtime_pct = df_out.loc[current_date, 'downtime_pct']
-            adj_oil_rate *= (1 - downtime_pct)
-
-        adj_gas_rate = interpolate_values(last_np_out, df_interpolate['Np'], df_interpolate['GOR']) * adj_oil_rate
-        adj_water_rate = interpolate_values(last_np_out, df_interpolate['Np'], df_interpolate['WOR']) * adj_oil_rate
-        adj_liquid_rate = adj_oil_rate + adj_water_rate
+            # Check if this date has all zero rates in the original dataframe
+            if current_date in df.index and df.loc[current_date, 'oil_rate'] == 0 and df.loc[current_date, 'gas_rate'] == 0 and df.loc[current_date, 'water_rate'] == 0:
+                # Honor zero rates only when all rates are zero
+                adj_oil_rate = 0
+                adj_gas_rate = 0
+                adj_water_rate = 0
+                adj_liquid_rate = 0
+            else:
+                # Use interpolated values for oil rate and adjust for downtime
+                adj_oil_rate = interpolate_values(last_np_out, df_interpolate['Np'], df_interpolate['oil_rate'])
+                downtime_pct = df_out.loc[current_date, 'downtime_pct']
+                adj_oil_rate *= (1 - downtime_pct)
+                
+                # Calculate gas and water rates
+                adj_gas_rate = interpolate_values(last_np_out, df_interpolate['Np'], df_interpolate['GOR']) * adj_oil_rate
+                adj_water_rate = interpolate_values(last_np_out, df_interpolate['Np'], df_interpolate['WOR']) * adj_oil_rate
+                adj_liquid_rate = adj_oil_rate + adj_water_rate
+        
+        # No need to check for adj_liquid_rate existence anymore
+        # if 'adj_liquid_rate' not in locals():
+        #     adj_liquid_rate = adj_oil_rate + adj_water_rate
 
         # Update cumulative productions
         days_in_month = get_days_in_month(current_date)
@@ -897,7 +914,7 @@ def process_production_data(df):
                 adj_oil_rate = df_out.loc[last_date, 'adj_oil_rate']
                 last_wor = df_out.loc[last_date, 'WOR']
                 adj_water_rate = adj_oil_rate * last_wor
-
+                
             # Update the rates in df_out
             df_out.loc[current_date, 'adj_oil_rate'] = adj_oil_rate
             df_out.loc[current_date, 'adj_gas_rate'] = adj_gas_rate
