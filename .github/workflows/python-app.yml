@@ -8,7 +8,10 @@ on:
 
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
 
     steps:
     - uses: actions/checkout@v3
@@ -25,4 +28,7 @@ jobs:
 
     - name: Run tests
       run: |
-        pytest 
+        # Cross-platform way to set PYTHONPATH
+        python -c "import sys; print(sys.platform)"
+        if [ \"$RUNNER_OS\" = \"Windows\" ]; then set PYTHONPATH=. && pytest; else PYTHONPATH=. pytest; fi
+      shell: bash
