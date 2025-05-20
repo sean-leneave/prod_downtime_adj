@@ -28,6 +28,7 @@ jobs:
         run: |
           pwd
           ls -l
+        shell: bash
 
       - name: Install dependencies
         run: |
@@ -65,6 +66,7 @@ jobs:
 
       - name: List installed packages
         run: pip list
+        shell: bash
 
       - name: show current directory and files
         run: |
