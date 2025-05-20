@@ -2,9 +2,9 @@ name: Python application
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ develop ]
   pull_request:
-    branches: [ main, develop ]
+    branches: [ develop ]
 
 jobs:
   build:
@@ -20,6 +20,15 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+
+      - name: Change to root directory
+        run: cd ..
+
+      - name: Show current directory and files
+        run: |
+          pwd
+          ls -l
+        shell: bash
 
       - name: Install dependencies
         run: |
@@ -54,3 +63,15 @@ jobs:
       - name: Check app starts
         run: |
           python downtime_adj_app.py --help 
+
+      - name: List installed packages
+        run: pip list
+        shell: bash
+
+      - name: show current directory and files
+        run: |
+          echo "Current directory:"
+          pwd
+          echo "Files in current directory:"
+          ls -la
+          
