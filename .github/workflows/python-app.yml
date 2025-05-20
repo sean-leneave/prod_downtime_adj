@@ -54,3 +54,14 @@ jobs:
       - name: Check app starts
         run: |
           python downtime_adj_app.py --help 
+
+      - name: List installed packages
+        run: pip list
+
+      - name: show current directory and files
+        run: |
+          echo "Current directory:"
+          pwd
+          echo "Files in current directory:"
+          ls -la
+          
