@@ -21,9 +21,6 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Change to root directory
-        run: cd ..
-
       - name: Show current directory and files
         run: |
           pwd
@@ -44,9 +41,9 @@ jobs:
         run: |
           if [ "$RUNNER_OS" = "Windows" ]; then
             set PYTHONPATH=.
-            pytest --cov --junitxml=junit.xml -o junit_family=legacy
+            pytest --cov --cov-report=xml --junitxml=junit.xml -o junit_family=legacy
           else
-            PYTHONPATH=. pytest --cov --junitxml=junit.xml -o junit_family=legacy
+            PYTHONPATH=. pytest --cov --cov-report=xml --junitxml=junit.xml -o junit_family=legacy
           fi
         shell: bash
 
