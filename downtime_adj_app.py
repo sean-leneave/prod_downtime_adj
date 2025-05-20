@@ -5,7 +5,12 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import io
 import zipfile
-from utils import standardize_downtime_percentage, interpolate_values, add_one_month, standardize_to_end_of_month
+from utils import (
+    standardize_downtime_percentage,
+    interpolate_values,
+    add_one_month,
+    standardize_to_end_of_month
+)
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 
@@ -121,11 +126,11 @@ def process_and_store_data():
         # Handle column mapping for forecast data
         standard_columns = {
             'Well Name': [
-                'well_name', 'well name', 'wellname', 'well', 'name', 'entity', 'Well Name'], 'date': [
-                'date', 'Date'], 'oil_rate': [
+                'well_name', 'well name', 'wellname', 'well', 'name', 'entity', 'Well Name'
+            ], 'date': ['date', 'Date'], 'oil_rate': [
                 'oil_rate', 'oil rate', 'oilrate', 'oil', 'Oil Rate'], 'gas_rate': [
-                    'gas_rate', 'gas rate', 'gasrate', 'gas', 'Gas Rate'], 'water_rate': [
-                        'water_rate', 'water rate', 'waterrate', 'wtrrate', 'water', 'wtr', 'Water Rate']}
+                'gas_rate', 'gas rate', 'gasrate', 'gas', 'Gas Rate'], 'water_rate': [
+                'water_rate', 'water rate', 'waterrate', 'wtrrate', 'water', 'wtr', 'Water Rate']}
 
         orig_columns = list(forecast_df.columns)
         normalized_columns = [str(col).strip().lower()
@@ -179,7 +184,8 @@ def process_and_store_data():
 
         if missing_cols:
             st.error(
-                f"Forecast file is missing required columns: {', '.join(missing_cols)}. Please check your file.")
+                f"Forecast file is missing required columns: {', '.join(missing_cols)}."
+                "Please check your file.")
             if DEBUG_MODE:
                 st.info(f"Available columns: {', '.join(forecast_df.columns)}")
             return False
@@ -203,8 +209,10 @@ def process_and_store_data():
             well_df = forecast_df[forecast_df['Well Name'] == well].copy()
             # Defensive check for downtime scenario
             scenario = ''
-            if not downtime_df.empty and 'Scenario' in downtime_df.columns and downtime_df['Scenario'].notnull(
-            ).any():
+            if not downtime_df.empty \
+                    and 'Scenario' in downtime_df.columns \
+                    and downtime_df['Scenario'].notnull(
+                    ).any():
                 scenario = downtime_df['Scenario'].iloc[0]
             dt_df = downtime_df[downtime_df['Scenario'] == scenario].copy(
             ) if scenario else downtime_df.copy()
@@ -259,10 +267,12 @@ def process_input_data(forecast_data, downtime_data):
                 forecast_df = pd.read_csv(io.StringIO(forecast_data), sep=',')
                 if DEBUG_MODE:
                     st.info(
-                        "Detected comma-separated values for forecast data instead of tabs. Processing anyway.")
+                        "Detected comma-separated values for forecast data instead of tabs."
+                        "Processing anyway.")
         except Exception as e:
             st.error(
-                f"Error parsing forecast data: {str(e)}\nPlease ensure data is tab-separated with proper headers.")
+                f"Error parsing forecast data: {str(e)}"
+                "Please ensure data is tab-separated with proper headers.")
             return None, None
 
         try:
@@ -271,10 +281,12 @@ def process_input_data(forecast_data, downtime_data):
                 downtime_df = pd.read_csv(io.StringIO(downtime_data), sep=',')
                 if DEBUG_MODE:
                     st.info(
-                        "Detected comma-separated values for downtime data instead of tabs. Processing anyway.")
+                        "Detected comma-separated values for downtime data instead of tabs."
+                        "Processing anyway.")
         except Exception as e:
             st.error(
-                f"Error parsing downtime data: {str(e)}\nPlease ensure data is tab-separated with proper headers.")
+                f"Error parsing downtime data: {str(e)}"
+                "Please ensure data is tab-separated with proper headers.")
             return None, None
 
         # Print loaded columns for debugging
@@ -288,7 +300,7 @@ def process_input_data(forecast_data, downtime_data):
                 'date', 'Date'], 'oil_rate': [
                 'oil_rate', 'oil rate', 'oilrate', 'oil', 'Oil Rate'], 'gas_rate': [
                     'gas_rate', 'gas rate', 'gasrate', 'gas', 'Gas Rate'], 'water_rate': [
-                        'water_rate', 'water rate', 'waterrate', 'wtrrate', 'water', 'wtr', 'Water Rate']}
+                'water_rate', 'water rate', 'waterrate', 'wtrrate', 'water', 'wtr', 'Water Rate']}
 
         orig_columns = list(forecast_df.columns)
         normalized_columns = [str(col).strip().lower()
@@ -342,7 +354,8 @@ def process_input_data(forecast_data, downtime_data):
 
         if missing_cols:
             st.error(
-                f"Forecast file is missing required columns: {', '.join(missing_cols)}. Please check your file.")
+                f"Forecast file is missing required columns: {', '.join(missing_cols)}."
+                "Please check your file.")
             if DEBUG_MODE:
                 st.info(f"Available columns: {', '.join(forecast_df.columns)}")
             return None, None
@@ -413,7 +426,8 @@ def process_batch_data(batch_data, downtime_data):
                     st.info("Detected comma-separated values for batch data.")
         except Exception as e:
             st.error(
-                f"Error parsing batch data: {str(e)}\nPlease ensure data is tab-separated with proper headers.")
+                f"Error parsing batch data: {str(e)}"
+                "Please ensure data is tab-separated with proper headers.")
             return None, None, None
 
         # Print debug info about loaded columns
@@ -429,7 +443,7 @@ def process_batch_data(batch_data, downtime_data):
                     'date', 'Date'], 'oil_rate': [
                     'oil_rate', 'oil rate', 'oilrate', 'oil', 'Oil Rate'], 'gas_rate': [
                     'gas_rate', 'gas rate', 'gasrate', 'gas', 'Gas Rate'], 'water_rate': [
-                        'water_rate', 'water rate', 'waterrate', 'wtrrate', 'water', 'wtr', 'Water Rate']}
+                    'water_rate', 'water rate', 'waterrate', 'wtrrate', 'water', 'wtr', 'Water Rate']}
 
             # Preserve original column names for reporting
             orig_columns = list(batch_df.columns)
@@ -487,7 +501,8 @@ def process_batch_data(batch_data, downtime_data):
 
             if missing_cols:
                 st.error(
-                    f"Batch forecast file is missing required columns: {', '.join(missing_cols)}. Please check your file.")
+                    f"Batch forecast file is missing required columns: {', '.join(missing_cols)}."
+                    "Please check your file.")
                 if DEBUG_MODE:
                     st.info(
                         f"Available columns: {', '.join(batch_df.columns)}")
@@ -505,7 +520,8 @@ def process_batch_data(batch_data, downtime_data):
                     st.info("Detected comma-separated values for downtime data.")
         except Exception as e:
             st.error(
-                f"Error parsing downtime data: {str(e)}\nPlease ensure data is tab-separated with proper headers.")
+                f"Error parsing downtime data: {str(e)}"
+                "Please ensure data is tab-separated with proper headers.")
             return None, None, None
 
         # Handle the downtime data columns using the same approach
@@ -568,7 +584,9 @@ def process_batch_data(batch_data, downtime_data):
                 downtime_df = downtime_df.rename(columns=dt_col_map)
 
         # Check for required columns in downtime data
-        if downtime_df is None or downtime_df.empty or 'date' not in downtime_df.columns or 'downtime_pct' not in downtime_df.columns:
+        if downtime_df is None or downtime_df.empty \
+                or 'date' not in downtime_df.columns \
+                or 'downtime_pct' not in downtime_df.columns:
             st.error(
                 "Downtime data must include non-empty 'date' and 'downtime_pct' columns.")
             return None, None, None
@@ -637,7 +655,8 @@ def validate_input_data(forecast_df, downtime_df):
     # Check if at least one fluid type is present
     if not available_fluid_cols:
         errors.append(
-            "At least one fluid type (oil_rate, gas_rate, or water_rate) is required in forecast data")
+            "At least one fluid type (oil_rate, gas_rate, or water_rate) \
+                is required in forecast data.")
     else:
         # Check if any available fluid has data (non-zero sum)
         has_fluid_data = False
@@ -656,7 +675,8 @@ def validate_input_data(forecast_df, downtime_df):
                 '') for col in possible_fluid_cols if col not in available_fluid_cols]
         if missing_fluids:
             warnings.append(
-                f"Note: No {', '.join(missing_fluids)} data provided. This is acceptable but may affect some calculations.")
+                f"Note: No {', '.join(missing_fluids)} data provided."
+                "This is acceptable but may affect some calculations.")
 
     # Check downtime data
     if 'downtime_pct' not in downtime_df.columns:
@@ -666,7 +686,8 @@ def validate_input_data(forecast_df, downtime_df):
         invalid_downtimes = downtime_df[downtime_df['downtime_pct'] > 1.0]
         if not invalid_downtimes.empty:
             errors.append(
-                "Downtime percentages must be between 0 and 100 (or 0 and 1 if in decimal format)")
+                "Downtime percentages must be between 0 and 100 \
+                (or 0 and 1 if in decimal format)")
 
     # Check date alignment between forecast and downtime data
     forecast_dates = set(forecast_df.index)
@@ -1373,7 +1394,7 @@ def copy_to_clipboard(data_type='rates', all_wells=False):
 
         # Create a download button
         st.download_button(
-            label=f"Download All Wells Excel",
+            label="Download All Wells Excel",
             data=buffer.getvalue(),
             file_name=f"all_wells_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
@@ -1689,17 +1710,14 @@ if st.session_state.show_docs:
     st.markdown('<div style="height: 2.5rem"></div>', unsafe_allow_html=True)
     with st.expander("Documentation", expanded=True):
         # Add extra padding and larger font for the expander header
-        st.markdown(
-            """
+        st.markdown("""
             <style>
             .streamlit-expanderHeader {
                 padding-top: 1.5rem !important;
                 font-size: 1.5rem !important;
             }
             </style>
-            """,
-            unsafe_allow_html=True,
-        )
+            """, unsafe_allow_html=True)
         st.markdown("## Process Flow & Interpolation Example")
         # Create two columns for the flowchart and plot
         flow_col, plot_col = st.columns([1, 1])
@@ -2012,7 +2030,8 @@ with col1:
                         st.info("Mapped 'well_name' to 'Well Name'")
                 elif 'Well Name' not in df.columns and well_name:
                     df.insert(0, 'Well Name', well_name)
-                elif 'Well Name' in df.columns and well_name and (df['Well Name'].isnull().all() or (df['Well Name'] == '').all()):
+                elif 'Well Name' in df.columns and well_name \
+                        and (df['Well Name'].isnull().all() or (df['Well Name'] == '').all()):
                     df['Well Name'] = well_name
 
                 required_cols = [
@@ -2531,7 +2550,7 @@ if st.session_state.processed_data is not None and 'processed_wells' in st.sessi
             help="Generate and download Mosaic templates for selected wells",
                 type="primary"):
             import io
-            import zipfile
+            # import zipfile  # REMOVE this line to fix F811
             zip_buffer = io.BytesIO()
             with zipfile.ZipFile(zip_buffer, 'w') as zf:
                 for well in selected_mosaic_wells:
