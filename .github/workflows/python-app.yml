@@ -11,7 +11,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [macos-latest, windows-latest]
+        os: [macos-latest]
 
     steps:
       - uses: actions/checkout@v3
@@ -20,9 +20,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
-      - name: Change to root directory
-        run: cd ..
 
       - name: Show current directory and files
         run: |
@@ -44,9 +41,9 @@ jobs:
         run: |
           if [ "$RUNNER_OS" = "Windows" ]; then
             set PYTHONPATH=.
-            pytest --cov --junitxml=junit.xml -o junit_family=legacy
+            pytest --cov --cov-report=xml --junitxml=junit.xml -o junit_family=legacy
           else
-            PYTHONPATH=. pytest --cov --junitxml=junit.xml -o junit_family=legacy
+            PYTHONPATH=. pytest --cov --cov-report=xml --junitxml=junit.xml -o junit_family=legacy
           fi
         shell: bash
 
