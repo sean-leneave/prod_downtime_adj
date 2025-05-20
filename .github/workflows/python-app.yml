@@ -24,6 +24,11 @@ jobs:
       - name: Change to root directory
         run: cd ..
 
+      - name: Show current directory and files
+        run: |
+          pwd
+          ls -l
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
