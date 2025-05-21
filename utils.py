@@ -56,4 +56,36 @@ def format_numbers(df, is_rate=True):
             else:
                 # Format volume columns with 2 decimal places
                 formatted_df[col] = formatted_df[col].apply(lambda x: '{:,.2f}'.format(x) if pd.notnull(x) else '')
-    return formatted_df 
+    return formatted_df
+
+
+def preprocess_rate_data(df):
+    """
+    Preprocess production rate data to handle blanks properly while preserving initial zeros.
+    
+    Args:
+        df: DataFrame with production rates (must have oil_rate, gas_rate, water_rate columns)
+        
+    Returns:
+        DataFrame with cleaned data with all zeros preserved
+    """
+    # Make sure NaN values are converted to zeros - this is the only preprocessing we want
+    for col in ['oil_rate', 'gas_rate', 'water_rate']:
+        if col in df.columns:
+            df[col] = df[col].fillna(0)
+    
+    return df.copy()
+
+
+def is_valid_production_data(df):
+    """
+    Check if the DataFrame contains valid production data.
+    
+    Args:
+        df: DataFrame with production rates
+        
+    Returns:
+        bool: True if valid production data exists (including all zeros)
+    """
+    # Check if DataFrame has data (even if all zeros)
+    return not df.empty and all(col in df.columns for col in ['oil_rate', 'gas_rate', 'water_rate']) 
