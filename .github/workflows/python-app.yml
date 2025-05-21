@@ -2,33 +2,73 @@ name: Python application
 
 on:
   push:
-    branches: [ main ]
+    branches: [ develop ]
   pull_request:
-    branches: [ main ]
+    branches: [ develop ]
 
 jobs:
   build:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [macos-latest, windows-latest]
+        os: [macos-latest]
 
     steps:
-    - uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
+      - name: Show current directory and files
+        run: |
+          pwd
+          ls -l
+        shell: bash
 
-    - name: Run tests
-      run: |
-        # Cross-platform way to set PYTHONPATH
-        python -c "import sys; print(sys.platform)"
-        if [ \"$RUNNER_OS\" = \"Windows\" ]; then set PYTHONPATH=. && pytest; else PYTHONPATH=. pytest; fi
-      shell: bash
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install flake8 pytest-cov codecov
+
+      - name: Lint with flake8
+        run: |
+          flake8 --max-line-length=130 .
+
+      - name: Run tests with coverage and JUnit report
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            set PYTHONPATH=.
+            pytest --cov --cov-report=xml --junitxml=junit.xml -o junit_family=legacy
+          else
+            PYTHONPATH=. pytest --cov --cov-report=xml --junitxml=junit.xml -o junit_family=legacy
+          fi
+        shell: bash
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/test-results-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Upload coverage to Codecov
+        if: ${{ runner.os == 'macOS' || runner.os == 'Windows' }}
+        run: bash <(curl -s https://codecov.io/bash) -f coverage.xml || echo 'Codecov upload failed'
+
+      - name: Check app starts
+        run: |
+          python downtime_adj_app.py --help 
+
+      - name: List installed packages
+        run: pip list
+        shell: bash
+
+      - name: show current directory and files
+        run: |
+          echo "Current directory:"
+          pwd
+          echo "Files in current directory:"
+          ls -la
+          

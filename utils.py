@@ -1,6 +1,6 @@
-import numpy as np
 import pandas as pd
 from scipy.interpolate import interp1d
+
 
 def standardize_downtime_percentage(value: float) -> float:
     """Convert downtime percentage to decimal format if needed."""
@@ -52,7 +52,9 @@ def format_numbers(df, is_rate=True):
         if pd.api.types.is_numeric_dtype(formatted_df[col]):
             if is_rate:
                 # Format rate columns with no decimal places
-                formatted_df[col] = formatted_df[col].apply(lambda x: '{:,.0f}'.format(x) if pd.notnull(x) else '')
+                formatted_df[col] = formatted_df[col].apply(
+                    lambda x: '{:,.0f}'.format(x) if pd.notnull(x) else ''
+                )
             else:
                 # Format volume columns with 2 decimal places
                 formatted_df[col] = formatted_df[col].apply(lambda x: '{:,.2f}'.format(x) if pd.notnull(x) else '')
