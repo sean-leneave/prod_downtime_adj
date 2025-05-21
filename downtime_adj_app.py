@@ -9,13 +9,12 @@ from utils import (
     standardize_downtime_percentage,
     interpolate_values,
     add_one_month,
-    standardize_to_end_of_month
+    standardize_to_end_of_month,
+    preprocess_rate_data
 )
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
-from openpyxl import load_workbook
-from openpyxl.styles import Font, PatternFill
-from utils import standardize_downtime_percentage, interpolate_values, get_raw_data_csv, add_one_month, standardize_to_end_of_month, format_numbers, preprocess_rate_data, is_valid_production_data
+
 
 # Constants
 DEBUG_MODE = False  # Set to True to show debugging info messages
@@ -209,13 +208,13 @@ def process_and_store_data():
         # Process each unique well independently
         st.session_state.processed_wells = {}
         all_wells = forecast_df['Well Name'].unique()
-        
+
         progress_bar = st.progress(0)
         for i, well in enumerate(all_wells):
             # Update progress
             progress_value = (i + 1) / len(all_wells)
             progress_bar.progress(progress_value)
-            
+
             well_df = forecast_df[forecast_df['Well Name'] == well].copy()
             # Defensive check for downtime scenario
             scenario = ''
@@ -236,17 +235,17 @@ def process_and_store_data():
                 if DEBUG_MODE:
                     st.info(f"Skipping {well} due to errors: {'; '.join(errors)}")
                 continue
-                
+
             # Join dataframes and process production data
             df = well_df.join(dt_df[['downtime_pct']], how='left')
             df = df.sort_index()
             df_out, df_interpolate = process_production_data(df)
-            
+
             # Add defensive check for empty result DataFrames
             if df_out is None or df_out.empty or len(df_out.index) == 0:
                 # Skip this well and move to the next one
                 continue
-                
+
             st.session_state.processed_wells[well] = {
                 'data': df_out,
                 'figure': create_plotly_figure(df_out, well_name=well)
@@ -412,12 +411,12 @@ def process_input_data(forecast_data, downtime_data):
         # Sort by date
         forecast_df.sort_index(inplace=True)
         downtime_df.sort_index(inplace=True)
-        
+
         # Fill any NaN values with zeros in numeric columns
         for col in ['oil_rate', 'gas_rate', 'water_rate']:
             if col in forecast_df.columns:
                 forecast_df[col] = forecast_df[col].fillna(0)
-        
+
         if 'downtime_pct' in downtime_df.columns:
             downtime_df['downtime_pct'] = downtime_df['downtime_pct'].fillna(0)
 
@@ -647,10 +646,10 @@ def process_batch_data(batch_data, downtime_data):
             well_df['water_rate'] = well_df['water_rate'].fillna(0)
             well_df = well_df.set_index('date')
             well_df.sort_index(inplace=True)
-            
+
             # Apply preprocessing to handle blanks properly but keep zeros
             well_df = preprocess_rate_data(well_df)
-            
+
             # Store processed well data
             well_data[well] = well_df
 
@@ -672,7 +671,7 @@ def validate_input_data(forecast_df, downtime_df):
     # Check forecast data
     possible_fluid_cols = ['oil_rate', 'gas_rate', 'water_rate']
     available_fluid_cols = [col for col in possible_fluid_cols if col in forecast_df.columns]
-    
+
     # Check if at least one fluid type is present
     if not available_fluid_cols:
         errors.append(
@@ -685,10 +684,10 @@ def validate_input_data(forecast_df, downtime_df):
             if forecast_df[col].sum() > 0:
                 has_fluid_data = True
                 break
-        
+
         if not has_fluid_data:
             errors.append("At least one fluid type must have non-zero values")
-        
+
         # Add warnings for missing fluid types
         missing_fluids = [
             col.replace(
@@ -717,7 +716,7 @@ def validate_input_data(forecast_df, downtime_df):
     if not forecast_dates.issubset(downtime_dates):
         missing_dates = forecast_dates - downtime_dates
         errors.append(f"Missing downtime data for dates: {sorted(missing_dates)}")
-    
+
     if not downtime_dates.issubset(forecast_dates):
         extra_dates = downtime_dates - forecast_dates
         warnings.append(f"Downtime data includes dates not in forecast: {sorted(extra_dates)}")
@@ -753,12 +752,12 @@ def process_production_data(df):
 
     # Make sure blanks are filled with zeros but preserve all data points
     df = preprocess_rate_data(df)
-    
+
     # Create additional columns
     df['liquid_rate'] = df['oil_rate'] + df['water_rate']
-    df['GOR'] = np.where(df['gas_rate'] / df['oil_rate']>0, df['gas_rate'] / df['oil_rate'], 0)
-    df['WOR'] = np.where(df['water_rate'] / df['oil_rate']>0, df['water_rate'] / df['oil_rate'], 0)
-    
+    df['GOR'] = np.where(df['gas_rate'] / df['oil_rate'] > 0, df['gas_rate'] / df['oil_rate'], 0)
+    df['WOR'] = np.where(df['water_rate'] / df['oil_rate'] > 0, df['water_rate'] / df['oil_rate'], 0)
+
     # Calculate days in month based on the date format
     def get_days_in_month(date):
         if date.day == 1:  # Beginning of month
@@ -794,20 +793,22 @@ def process_production_data(df):
         if non_zero_mask.any():
             first_non_zero_idx = non_zero_mask.idxmax()
             non_zero_df = df.loc[first_non_zero_idx:]
-            
+
             # Look for the peak rate in the non-zero data
             primary_fluid = 'oil_rate'
             if non_zero_df['gas_rate'].sum() > non_zero_df['oil_rate'].sum() * 5:  # Gas dominant
                 primary_fluid = 'gas_rate'
-            
+
             # Find peak rate index
             peak_index = non_zero_df[primary_fluid].idxmax()
-            
+
             # Get the position in the original dataframe
             decline_start_index = df.index.get_loc(peak_index)
-            
+
             if DEBUG_MODE:
-                st.info(f"Identified decline start at position {decline_start_index} (peak {primary_fluid.split('_')[0]} rate).")
+                st.info(
+                    f"Identified decline start at position {decline_start_index} \
+                        (peak {primary_fluid.split('_')[0]} rate).")
         else:
             # This should not happen due to previous check
             decline_start_index = 0
@@ -837,8 +838,9 @@ def process_production_data(df):
     df_out = df_out.astype(dtype_dict)
 
     # Perform the initial row calculations and assign them to df_out
-    df_out.loc[df_out.index[0], 'adj_oil_rate'] = df_out.loc[df_out.index[0],
-                                                             'oil_rate'] * (1 - df_out.loc[df_out.index[0], 'downtime_pct'])
+    df_out.loc[df_out.index[0], 'adj_oil_rate'] = (
+        df_out.loc[df_out.index[0], 'oil_rate'] * (1 - df_out.loc[df_out.index[0], 'downtime_pct'])
+    )
     df_out.loc[df_out.index[0],
                'adj_gas_rate'] = df_out.loc[df_out.index[0],
                                             'GOR'] * df_out.loc[df_out.index[0],
@@ -931,10 +933,11 @@ def process_production_data(df):
             adj_liquid_rate = adj_oil_rate + adj_water_rate
         else:
             # Check if this date has all zero rates in the original dataframe
-            if current_date in df.index and df.loc[current_date,
-                                                   'oil_rate'] == 0 and df.loc[current_date,
-                                                                               'gas_rate'] == 0 and df.loc[current_date,
-                                                                                                           'water_rate'] == 0:
+            if current_date in df.index and (
+                df.loc[current_date, 'oil_rate'] == 0 and
+                df.loc[current_date, 'gas_rate'] == 0 and
+                df.loc[current_date, 'water_rate'] == 0
+            ):
                 # Honor zero rates only when all rates are zero
                 adj_oil_rate = 0
                 adj_gas_rate = 0
@@ -2076,7 +2079,8 @@ with col1:
 
                 if missing_cols:
                     st.error(
-                        f"Forecast file is missing required columns: {', '.join(missing_cols)}. Please check your file.")
+                        f"Forecast file is missing required columns: {', '.join(missing_cols)}."
+                        "Please check your file.")
                     if DEBUG_MODE:
                         st.info(f"Available columns: {', '.join(df.columns)}")
                 elif df.empty:
@@ -2283,7 +2287,8 @@ with col2:
 
                 if missing_cols:
                     st.error(
-                        f"Downtime file is missing required columns: {', '.join(missing_cols)}. Please check your file.")
+                        f"Downtime file is missing required columns: {', '.join(missing_cols)}."
+                        "Please check your file.")
                     if DEBUG_MODE:
                         st.info(f"Available columns: {', '.join(df.columns)}")
                 elif df.empty:
@@ -2416,7 +2421,9 @@ def process_and_store_batch_data():
 
 # Display results if data is processed
 st.markdown("<div class='section-break'></div>", unsafe_allow_html=True)
-if st.session_state.processed_data is not None and 'processed_wells' in st.session_state and st.session_state.processed_wells:
+if st.session_state.processed_data is not None \
+        and 'processed_wells' in st.session_state \
+        and st.session_state.processed_wells:
     df_out = st.session_state.processed_data
     st.markdown("## Results")
     # Well selection dropdown (always show if processed_wells exists)

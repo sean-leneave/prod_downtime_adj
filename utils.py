@@ -64,10 +64,10 @@ def format_numbers(df, is_rate=True):
 def preprocess_rate_data(df):
     """
     Preprocess production rate data to handle blanks properly while preserving initial zeros.
-    
+
     Args:
         df: DataFrame with production rates (must have oil_rate, gas_rate, water_rate columns)
-        
+
     Returns:
         DataFrame with cleaned data with all zeros preserved
     """
@@ -75,19 +75,19 @@ def preprocess_rate_data(df):
     for col in ['oil_rate', 'gas_rate', 'water_rate']:
         if col in df.columns:
             df[col] = df[col].fillna(0)
-    
+
     return df.copy()
 
 
 def is_valid_production_data(df):
     """
     Check if the DataFrame contains valid production data.
-    
+
     Args:
         df: DataFrame with production rates
-        
+
     Returns:
         bool: True if valid production data exists (including all zeros)
     """
     # Check if DataFrame has data (even if all zeros)
-    return not df.empty and all(col in df.columns for col in ['oil_rate', 'gas_rate', 'water_rate']) 
+    return not df.empty and all(col in df.columns for col in ['oil_rate', 'gas_rate', 'water_rate'])
