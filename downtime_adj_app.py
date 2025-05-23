@@ -237,6 +237,11 @@ def process_and_store_data():
                 continue
 
             # Join dataframes and process production data
+            well_df['date'] = pd.to_datetime(well_df['date']).apply(standardize_to_end_of_month)
+            dt_df['date'] = pd.to_datetime(dt_df['date']).apply(standardize_to_end_of_month)
+            well_df.set_index('date', inplace=True)
+            dt_df.set_index('date', inplace=True)
+
             df = well_df.join(dt_df[['downtime_pct']], how='left')
             df = df.sort_index()
             df_out, df_interpolate = process_production_data(df)
