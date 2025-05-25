@@ -2593,32 +2593,31 @@ if st.session_state.processed_data is not None \
             help="Generate and download Mosaic templates for selected wells",
                 type="primary"):
             import io
-            # import zipfile  # REMOVE this line to fix F811
-            zip_buffer = io.BytesIO()
-            with zipfile.ZipFile(zip_buffer, 'w') as zf:
-                for well in selected_mosaic_wells:
-                    mosaic_df = create_mosaic_template(
-                        df_out=st.session_state.processed_wells[well]['data'],
-                        entity_name=well,
-                        reserve_category=reserve_category
-                    )
-                    excel_buffer = io.BytesIO()
-                    with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
-                        mosaic_df.to_excel(
-                            writer, index=False, sheet_name='Sheet1')
-                    excel_buffer.seek(0)
-                    today_str = pd.Timestamp.now().strftime('%Y%m%d')
-                    filename = f"{reserve_category}_{well}_Mosaic_Template_{today_str}.xlsx"
-                    zf.writestr(filename, excel_buffer.getvalue())
+            # Aggregate all mosaic DataFrames
+            mosaic_dfs = []
+            for well in selected_mosaic_wells:
+                mosaic_df = create_mosaic_template(
+                    df_out=st.session_state.processed_wells[well]['data'],
+                    entity_name=well,
+                    reserve_category=reserve_category
+                )
+                mosaic_dfs.append(mosaic_df)
 
-            # Create the download button for the generated ZIP
-            zip_buffer.seek(0)
-            zip_filename = f"Mosaic_Templates_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.zip"
+            # Vertically stack all wells
+            if mosaic_dfs:
+                all_mosaic_df = pd.concat(mosaic_dfs, ignore_index=True)
+                excel_buffer = io.BytesIO()
+                with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
+                    all_mosaic_df.to_excel(writer, index=False, sheet_name='Mosaic')
+                excel_buffer.seek(0)
+                excel_filename = f"Mosaic_Export_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
 
-            st.download_button(
-                label="Click to Download Mosaic Templates",
-                data=zip_buffer.getvalue(),
-                file_name=zip_filename,
-                mime="application/zip",
-                key="download_mosaic"
-            )
+                st.download_button(
+                    label="Click to Download Mosaic Export",
+                    data=excel_buffer.getvalue(),
+                    file_name=excel_filename,
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key="download_mosaic"
+                )
+            else:
+                st.warning("No wells selected for Mosaic export.")
